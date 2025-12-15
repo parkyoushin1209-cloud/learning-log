@@ -1,0 +1,109 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include <stdlib.h>
+
+void swap(int* a, int* b) {
+	int temp = *a;
+	*a = *b;
+	*b = temp;
+}
+
+1. 버블 정렬
+특징: 시간복잡도 최선 O(n) => 변형 필요 스왑 없을 시 break 처리 보통 O(n^2) 이중 반복문, 앞에서부터 뒤로가며 조건 만족시 스왑
+장점: 추가적인 메모리는 필요 없음 
+단점: n이 커지면 시간 매우 많이 걸림 
+void bubbleSort(int arr[], int n) {
+	for (int i = 0; i < n-1; i++) { // 반복 횟수
+		for (int j = 0; j < n - 1 - i; j++) { // 인접 원소 비교
+			if (arr[j] > arr[j + 1]) swap(&arr[j], &arr[j + 1]); // 순서 이상 -> 스왑
+		}
+	}
+}
+
+
+2. 병합 정렬
+특징: 배열을 반으로 계속 쪼개고 더 이상 쪼갤 수 없으면 병합 시작-> 매번 쪼갬 logn 어쨋든 전체 배열을 돔 n -> 시간복잡도 O(nlogn)
+장점: 안정 정렬임-왼쪽 배열과 오른쪽 배열들 각각으로 보면 순서가 유지되며 왼쪽 오른쪽 값이 같더라도 arr[i] <= arr[j]이므로 왼쪽 데이터가 더 앞으로 감
+시간 복잡도는 최악의 경우에도 nlogn을 보장 별다른 조작 없이 그냥 mid값 구해서 나누므로 -> 큰 데이터도 가능
+단점: temp라는 메모리 공간이 필요함 -> 정렬된 데이터를 담고 있어야 이후 원래 배열로 순서 유지하며 저장할 수 있으므로  
+
+
+void merge(int arr[], int left, int mid, int right) {  //이미 정렬된 두 배열을 하나로 합침, 작은 값부터 temp에 넣음
+	int i = left;
+	int j = mid + 1;
+	int k = 0;
+
+	int* temp = (int*)malloc((right - left + 1) * sizeof(int));
+
+	while (i <= mid && j <= right) {  // 두 부분 배열을 비교하며 병합
+		if (arr[i] <= arr[j]) {
+			temp[k++] = arr[i++];
+		}
+		else {
+			temp[k++] = arr[j++];
+		}
+	}
+//두 whlie문은 순서 상관 없음 -> 어차피 한쪽 배열에만 값이 남아 있기 때문에
+	while (i <= mid)  //왼쪽 배열에 남은 것들
+		temp[k++] = arr[i++];
+
+	while (j <= right) // 오른쪽 배열 남은 것들  
+		temp[k++] = arr[j++];
+
+
+	for (i = left, k = 0; i <= right; i++, k++)  	//원래 배열로 복사
+		arr[i] = temp[k];
+
+	free(temp);
+}
+
+
+
+void mergesort(int arr[], int left, int right) {   //배열을 반으로 계속 분할, 끝까지 가면 멈춤 left >= right
+	if (left < right) { //단일 요소에서는 병합 x (if문 실행 안됨)
+		int mid = (left + right) / 2;
+
+		mergesort(arr, left, mid);
+		mergesort(arr, mid + 1, right);
+		merge(arr, left, mid, right);
+	}
+}
+
+
+void countingSort(int arr[], int n, int exp) {  //특정 자리수 기준 counting Sort
+	int* output = (int*)malloc(n * sizeof(int));  //추가적인 메모리 공간도 필요
+	int count[10] = { 0 };
+
+
+	for (int i = 0; i < n; i++)  	//각 자리수 카운트
+		count[(arr[i] / exp) % 10]++;
+
+	
+	for (int i = 1; i < 10; i++)  	//누적합 계산 -> 각 자리수 별로 처음 나온 위치 파악 가능
+		count[i] += count[i - 1];
+
+
+	for (int i = n - 1; i >= 0; i--) {  //안정 정렬 적용 뒤에서부터 -> 앞에서 부터 넣으면 뒤에 있는 수의 자릿수가 더 작을 경우 순서 바뀜 -> 안정성 깨짐 
+		output[count[(arr[i] / exp) % 10] - 1] = arr[i];
+		count[(arr[i] / exp) % 10]--;
+	}
+
+	
+	for (int i = 0; i < n; i++) //원래 배열로 복사
+		arr[i] = output[i];
+	free(output);
+}
+
+//병합 정렬
+특징: 각 자리수별로 정렬함 , 각각의 데이터끼리의 비교는 필요 없음 -> 시간적인 면에서 유리
+보통 낮은 자리수 -> 높은 자리수로 가나 그 반대도 가능은 함 다만 안정성 유지까지 필요하므로 더 복잡해짐 
+장점: 비교 기반 정렬보다 큰 수의 정수나 문자열 정렬에 유리, 항상 O(d*n) 보장-> max값의 자릿수만큼 반복 + 단일 반복, 안정 정렬임 
+단점: 메모리 필요, 비교 기반이 아닌 특수 상황에서만 사용 가능(정수, 고정길이 문자열 등)
+
+void radixSort(int arr[], int n) {  //기수 정렬
+	int max = arr[0];  //배열에서 가장 큰 수 찾기
+	for (int i = 1; i < n; i++)
+		if (arr[i] > max) max = arr[i];
+	for (int exp = 1; max / exp > 0; exp *= 10)  //자리수별로 counting sort 수행 => 안정정렬 사용
+		countingSort(arr, n, exp);
+}
