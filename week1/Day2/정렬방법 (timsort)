@@ -50,7 +50,7 @@ void timsort(int arr[], int n) {
 	}
 
 	for (int size = RUN; size < n; size = 2 * size) {
-		for (int left = 0; left < n; left = 2 * size) {
+		for (int left = 0; left < n; left += 2 * size) {
 			int mid = left + size - 1;
 			int right = (left + 2 * size - 1 < n - 1) ? i + 2 * size - 1 : n - 1;
 			if (mid < right)
