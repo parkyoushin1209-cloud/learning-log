@@ -82,7 +82,7 @@ void counting_sort(int data[],int size) {
 	for (int i = 0; i < size; i++)
 		count[data[i]]++;
 
-	for (int i = 0; i < size; i++) {
+	for (int i = 0; i <= max; i++) {
 		for (int j = 0; j < count[i]; j++)
 			printf("%d ", i);
 	}
