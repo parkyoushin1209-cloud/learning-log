@@ -1,0 +1,60 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include <stdlib.h>
+#define RUN 32  // 구간 크기 설정
+
+void insertionsort(int arr[], int left, int right) {
+	for (int i = left + 1; i <= right; i++) {
+		int temp = arr[i];
+		int j = i - 1;
+		while (j >= left && arr[j] > temp) {
+			arr[j + 1] = arr[j];
+			j-- ;
+		}
+		arr[j + 1] = temp;
+	}
+} // 삽입 정렬 작은 구간에 대하여는 삽입 정렬 필요, 일반적인 삽입 정렬과 마찬가지로 앞 데이터들은 정렬되있다는 가정하
+
+void merge(int arr[], int l, int m, int r) {
+	int len1 = m - l + 1, len2 = r - m; // len1 => l ~ m / len2 -> m+1 ~ r
+	int* left = (int*)malloc(sizeof(int) * len1);
+	int* right = (int*)malloc(len2 * sizeof(int));
+	for (int i = 0; i < len1; i++)left[i] = arr[l + i];
+	for (int i = 0; i < len2; i++)right[i] = arr[m + 1 + i];//각 부분에 맞게 left와 right에 저장해둠
+
+	int i = 0, j = 0, k = l;
+	while (i < len1 && j < len2) {
+		if (left[i] <= right[j])arr[k++] = left[i++];
+		else arr[k++] = right[j++];
+	}
+
+	while (i < len1) arr[k++] = left[i++];
+	while (i < len2)arr[k++] = right[j++];
+
+	free(left); free(right);
+}
+//병합 정렬에서 쓴느 병합 함수와 동일
+
+**timsort
+특징: 병합 정렬, 삽입 정렬 하이브리드 버전임
+작은 부분에 대하여 삽입 정렬 후 부분들을 모아 병합 실행, 시간 복잡도 최선 O(n) 최악 O(nlogn) 파이썬의 sort가 이 정렬을 사용함
+병합 정렬과 다르게 무조건 나누는 것이 아니고 정렬되 있는 경우 삽입정렬과 비슷하게 스캔 -> 마무리 따라서 시간복잡도 최선은 O(N)
+삽입 정렬 -> 병합 정렬(데이터가 커질 경우) 
+장점: 실용적임, 매우 빠름, 안정적임 
+****왜 실용적인가? -> 현실에서는 데이터가 이미 정렬되있고 이후 살짝 추가되는 경우가 대부분 -> 일부만 수정하면 됨 timsort는 정렬을 새로 만든다기보다는 이미 있는 데이터를 이용하는 느낌에 가까움 따라서 매우 실용적
+단점: 구현이 복잡함, 병합 함수에서 추가 적인 메모리 공간이 필요함
+void timsort(int arr[], int n) {
+	for (int i = 0; i < n; i += RUN) {
+		int right = (RUN + i - 1 < n - 1) ? RUN + i - 1 : n - 1;
+		insertionsort(arr, i, right);
+	}
+
+	for (int size = RUN; size < n; size = 2 * size) {
+		for (int left = 0; left < n; left = 2 * size) {
+			int mid = left + size - 1;
+			int right = (left + 2 * size - 1 < n - 1) ? i + 2 * size - 1 : n - 1;
+			if (mid < right)
+				merge(arr, left, mid, right);
+		}
+	}
+}
