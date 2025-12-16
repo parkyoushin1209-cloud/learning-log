@@ -83,8 +83,9 @@ void counting_sort(int data[],int size) {
 		count[data[i]]++;
 
 	for (int i = 0; i <= max; i++) {
-		for (int j = 0; j < count[i]; j++)
-			printf("%d ", i);
+		int c = count[i];
+        while(c--)// 변수 이름 다르게 가져가기*******
+        printf("%d ",i);
 	}
 
 	free(count);
