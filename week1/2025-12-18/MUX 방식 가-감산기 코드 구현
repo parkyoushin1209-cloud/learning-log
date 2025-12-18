@@ -1,0 +1,51 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include <stdlib.h>
+
+void add_sub(int a, int b,int mode) {
+	if (a < 0 || b < 0)
+		return;
+	int i = 0;
+	int carry_bit = (mode == 0) ? 0:1;
+	int result[4];
+	//int input_carry_bit = 2;
+	//int check = 0;
+	while (i < 4) {
+		int first = (a >> i) & 1;
+		int second = (mode == 0)?((b >> i) & 1) : (((b >> i) & 1)^1);
+		int sum = carry_bit + first + second;
+		carry_bit = (sum >> 1) & 1;
+		result[i] = (sum >> 0) & 1;
+		//if(i==2) input_carry_bit = carry_bit
+		//if(i==3) if(input_carry_bit != carry_bit) check = 1;
+		i++;
+
+	}
+	if(mode == 0 && carry_bit == 1){
+		printf("overflow\n");
+		return;
+	}
+	// unsigned 방식은 carry_bit만 비교해도 됨
+	//signed 일 경우 if (check == 1) printf("overflow\n);
+	else {
+		for (int j = 3; j >= 0; j--)
+			printf("%d", result[j]);
+		printf("\n");
+		return;
+	}
+}
+
+
+int main() {
+	int mode;
+	printf("add 는 0 sub는 1: ");
+	scanf("%d", &mode);
+	int a, b;
+	printf("a,b 값 입력 a,b는 양수\n");
+	scanf("%d %d", &a, &b);
+	add_sub(a, b, mode);
+
+
+	return 0;
+}
+핵심: 감산인 경우 2의 보수 취해야 함 -> 비트 반전 + 최하위 캐리비트 1로 설정 -> B^1 = B`이므로 
