@@ -1,1 +1,43 @@
+패러데이 유도 법칙: 기전력러데이 유도 법칙: 기전력 = - d자기선속/dt => 원래의 자기선속 유지하려고 함
+
+렌츠의 법칙: 닫힌 회로에서 유도 전류는 닫힌 부분을 통과하는 자기선속의 변화를 방해하는 방향으로 자기장 발생시킴
+=> 닫힌회로에서 자기선속(자기력 * 면적)이 증가 -> 감소하는 방향으로 전력 흐름 반대의 경우도 마찬가지
+유도 기전력 = -L * di/dt (L은 비례상수로 기하학적 모양, 물리적 특성에 영향 받음 단위는 H-헨리)
+
+RL 회로:
+전지에 연결된 경우 i = 기전력/저항 * (1-e^(-t/시간상수)) 시간상수 =L/R
+전지 없어짐 i = I(i) * e^(-t/시간상수)
+
+자기장 내의 에너지 = B^2*V(부피)/(2*u)  상호 유도 계수 => M(12) = u(2)*자기선속(2)/i(1) M(21)은 1 <-> 2 
+
+LC회로:
+E(tot) = Q(max)^2/(2*c) = 1/2*L*I(max)^2 을 유지함(저항이 없고 외부로 나가는 에너지 없을 경우) 
+q = Q(max)cos(wt + O) w = 1 / sqrt(L*c)
+
+RLC 회로:
+(q/c)(dq/dt) + Li(di/dt) + i^2R = 0
+q = Q(max)e^(-Rt/2L)cos(w(d)t) w(d) = sqrt(1/LC - (R/2L)^2) R = sqtr(4L/C) => 임계감쇠 더 커지면 과감쇠 => 진동 발생하지 않음
+
+교류 전원
+V = V(max)sin(wt) w = 2pif = 2pi/T
+          전압                전류
+저항기 I(max)Rsin(wt)     V(max)/R*sin(wt)
+인덕터 I(max)X(L)sin(wt)  V(max)/X(L)sin(wt-pi/2)  X(L) = 유도 리액턴스 = wL
+축전기 I(max)X(c)sin(wt) V(max)/X(c)sin(wt+pi/2)   X(c) = 용량 리액턴스 = 1/wc
+
+RLC직렬회로
+i = I(max)sin(wt-o)
+o = arctan((V(L) - V(c)) / V(R))   
+v(R) = I(max)Rsin(wt-o) = V(R)sin(wt-o)
+v(L) = I(max)X(L)sin(wt - o + pi/2) = V(L)cos(wt-o)
+v(C) =  I(max)X(c)sin(wt - o - pi/2) = -V(c)cos(wt-o)
+V(max) = I(max)Z Z = 임피던스 = sqrt(R^2 - (X(L) - X(C))^2)   // X(L) > X(C) => 유도성 X(L) < X(C) => 용량성
+AC회로 전력 P(avg) = I(rms) * V(rms) * cos(o)   //cos(o) = 전력인자 = R/Z
+=> X(L) = X(C)일 때의 w를 공명 진동수라 하며 이 때 평균 전력이 최대
+
+변압기 V(1) = -N(1) * (d자기선속/dt)    V(2) = -N(2)(d자기선속/dt) = I(1)/I(2)*V(1) = N(2)/N(1) * V(1)
+R(eq) = (N(1)/N(2))^2 * R(L), V(1), I(1), N(1), R(eq) => 1차 코일 쪽 나머지는 이차 코일쪽이며 자기선속 변화는 동일함
+
+
+
 
