@@ -1,0 +1,43 @@
+module stimuls;
+reg clock;
+
+always @( clock)
+begin // clock은 always@ 기반 수정하면 안됨 -> race condition 발생 가능, 클록은 시간으로 로직은 엣지로
+    if(clock) #10 clock = ~clock;
+    else #30 clock = ~clock; // 테스트벤치에서 가능은 하나 이런 구조에서는 race condition 문제를 키울 수 있음
+end
+//race condition = 같은 시간에 실행되는데 실행 순서에 따라 결과가 달라지는 상황
+//다른 always문이 있을 경우 clock값이 바로 바뀌게 되면 posedge clock과 같은 경우 뭐가 먼저 실행될지 모름
+//self trigger는 사용하지 않기
+
+begin
+    clock = 1'b0;
+    #400 $finish;
+end
+
+initial
+$monitor($time, " clock = %b",clock);
+endmodule;
+
+
+
+module stimulus;
+reg clock;
+
+initial 
+begin
+    clock = 0;
+    forever begin
+        #30 clock = 0;
+        #10 clock = 1; 
+    end
+end
+
+ initial begin
+        #400 $finish;
+    end
+
+    initial begin
+        $monitor($time, " clock = %b", clock);
+    end
+endmodule
