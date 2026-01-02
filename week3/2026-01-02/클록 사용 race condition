@@ -9,6 +9,7 @@ end
 //race condition = 같은 시간에 실행되는데 실행 순서에 따라 결과가 달라지는 상황
 //다른 always문이 있을 경우 clock값이 바로 바뀌게 되면 posedge clock과 같은 경우 뭐가 먼저 실행될지 모름
 //self trigger는 사용하지 않기
+// non_blocking이나 단일 initial 사용 권장
 
 begin
     clock = 1'b0;
