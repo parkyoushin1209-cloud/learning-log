@@ -1,0 +1,43 @@
+`timescale 1ns/1ps
+
+module counter8bit(
+    output reg [7:0] q
+);
+
+    initial begin
+        q = 8'd5; // 시작값
+    end
+
+endmodule
+
+
+module tb_counter8bit;
+
+    wire [7:0] Q;
+    reg CLOCK;
+
+    counter8bit uut (Q);
+
+    integer i;
+
+    initial begin
+        CLOCK = 0;
+        forever #5 CLOCK = ~CLOCK;
+    end
+
+    initial begin: count_block
+        forever @(posedge CLOCK) begin
+            if (Q < 8'd67)
+                uut.q = uut.q + 1;//Q는 대입 불가능 -> uut.q 사용 테스트벤치 시뮬에서만 가능
+            else
+                disable count_block; // 67 도달 시 루프 종료
+            $display("time=%0t, Count = %d", $time, Q);
+        end
+    end
+
+    initial begin
+        #1000 $finish; // 충분한 시뮬레이션 시간
+    end
+
+endmodule
+
