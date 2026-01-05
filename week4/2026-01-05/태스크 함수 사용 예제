@@ -1,0 +1,42 @@
+module operation;//태스크 사용 예시
+
+parameter delay = 10;
+reg [15:0] A,B;
+reg [15:0] AB_AND, AB_OR, AB_XOR;
+
+always @(A or B)
+begin
+    bitwise_oper(AB_AND, AB_OR, AB_XOR, A, B) //인자는 태스크 선언과 같은 순서대로
+end
+
+task bitwise_oper;
+output [15:0] ab_and, ab_or, ab_xor;
+input [15:0] a, b;
+begin
+    #delay ab_and = a & b;
+    ab_or = a | b;
+    ab_xor = a ^ b;
+end
+endtask
+
+endmodule;
+
+module parity;
+
+reg [31:0] addr;
+reg parity;
+
+always(addr)
+begin
+    parity = calc_parity(addr);
+    $display("parity calculated = %b", calc_parity(addr) );
+end
+
+function calc_parit;
+input [31:0] address;
+begin
+    calc_parity = ^address;
+end
+endfunction
+
+endmodule;
