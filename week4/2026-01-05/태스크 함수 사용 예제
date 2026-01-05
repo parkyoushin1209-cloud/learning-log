@@ -21,7 +21,31 @@ endtask
 
 endmodule;
 
-module parity;
+module stimulus;
+
+parameter delay = 10;
+reg [3:0] IN;
+reg [31:0] RESULT;
+
+initial begin
+IN = 4'b0111; // RESULT = 1; 이렇게 작성시 output이 아닌 inout으로
+#10 factorial_4bit(RESULT,IN);
+$display($time," result is %d",RESULT);
+end
+
+task factorial_4bit(output [31:0] result, input [3:0] in);
+integer i;
+begin
+    result = 1;
+for(i = in; i>0; i--)
+result *= i;
+end
+endtask;
+
+
+endmodule;
+
+module parity;//함수 사용 예시
 
 reg [31:0] addr;
 reg parity;
