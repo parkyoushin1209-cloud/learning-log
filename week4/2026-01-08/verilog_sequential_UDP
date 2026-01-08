@@ -1,0 +1,31 @@
+primitive ratch(q, d, clock, preset);
+output reg q; // 순차에서만 - 사용가능하며 reg로 선언해야함
+input d, clock, preset;
+table
+// d clock preset q : q+ 
+? ? 1 : ? : 1; // 현재상태 추가하기 앞에 :도
+? ? x : ? : x;
+0 0 0 : ? : 0;
+1 0 0 : ? : 1;
+? 1 0 : ? : -;
+? x 0 : ? : -;
+endtable
+endprimitive;
+
+module stimulus;
+reg D, CLOCK, PRESET;
+wire Q;
+
+ratch m(Q, D, CLOCK, PRESET);
+
+initial begin
+    {D, CLOCK, PRESET} = 0;
+    while({D, CLOCK, PRESET} < 7)
+    #5 {D, CLOCK, PRESET} = {D, CLOCK, PRESET} + 1;//while문에 시간 지연 필수!!
+end
+
+initial 
+$monitor($time," D:%b CLOCK:%b PRESET:%b Q:%b ",D, CLOCK, PRESET, Q);
+
+
+endmodule;
