@@ -1,0 +1,67 @@
+module D_FF(q, d, clock, clear);
+output reg q;
+input d, clock, clear;
+
+initial begin
+q = 0;
+end
+
+always @ (posedge clock)begin
+    if(clear) q <= 1'b0;
+    else
+    q <= d;
+end
+
+endmodule;
+
+module mux2to1(out, s, in1, in2);
+output reg out;
+input s, in1, in2;
+
+always @(s, in1, in2)begin // mux는 입력이 변하면 출력도 변해야 함 sensitivity list에 in1,in2 추가
+    case(s)
+    1'b0: out = in1;
+    1'b1: out = in2;
+    endcase
+end
+
+endmodule;
+
+
+module jk_ff(q, j, k, clock, clear);
+output q;
+input j, k , clock, clear;
+
+
+wire d, kbar;
+not(kbar, k);
+
+mux2to1 mux0(d, q, j, kbar);
+D_FF ff0(q, d, clock, clear);
+
+endmodule;
+
+
+
+module stimulus;
+reg J, K, CLOCK, CLEAR;
+wire Q;
+
+jk_ff FF0(Q, J, K, CLOCK, CLEAR);
+
+initial CLOCK = 0;
+always #5 CLOCK = ~CLOCK; // forever는 $finish 시간과 겹치면 안끝나고 계속 토글 연산 수행할 수도 있음
+
+initial begin
+CLEAR = 1; J = 0; K = 0;
+#10 CLEAR = 0;
+#20 J = 0; K = 1;
+#20 J = 1; K = 0;
+#20 J = 1; K = 1;
+#20 $finish;
+end
+
+initial
+$monitor($time," J:%b K:%b Q:%b D:%b",J, K, Q, FF0.d);
+
+endmodule;
