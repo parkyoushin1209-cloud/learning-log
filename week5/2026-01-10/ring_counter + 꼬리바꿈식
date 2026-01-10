@@ -1,0 +1,69 @@
+module ring_counter(out, clk);
+output reg [3:0] out = 4'b1000;
+input clk;
+
+always @(posedge clk)begin
+    out [3:0] <= {out[0], out[3:1]}; 
+end
+endmodule
+
+module stimulus;
+reg CLK;
+wire [3:0] OUT;
+
+ring_counter c(OUT, CLK);
+
+initial CLK = 0;
+always #5 CLK = ~CLK;
+
+initial
+$monitor($time, " COUNT:%b", OUT);
+
+initial
+#100 $finish;
+
+endmodule;
+
+/////////////////////////////////////////
+////////////////////////////////////////////
+////////////////////////////////////////////////////(꼬리바꿈식)
+module D_FF(q, qbar, d, clk);
+output reg q = 0;
+output qbar;
+assign qbar = ~q;
+input d,clk;
+
+always @(posedge clk)
+q <= d;
+endmodule;
+
+module ring_counter(out, outbar, clk);
+output [3:0] out;
+output [3:0]outbar;
+assign outbar = ~out;
+
+input clk;
+
+D_FF ff0(out[3], outbar[3], outbar[0], clk);
+D_FF ff1(out[2], outbar[2], out[3], clk);
+D_FF ff2(out[1], outbar[1], out[2], clk);
+D_FF ff3(out[0], outbar[0], out[1], clk);
+
+endmodule;
+
+module stimulus;
+reg CLK;
+wire [3:0] OUT;
+wire [3:0] OUTBAR;
+ring_counter c(OUT, OUTBAR, CLK);
+
+initial CLK = 0;
+always #5 CLK = ~CLK;
+
+initial
+$monitor($time, " COUNT:%b", OUT);
+
+initial
+#300 $finish;
+
+endmodule;
