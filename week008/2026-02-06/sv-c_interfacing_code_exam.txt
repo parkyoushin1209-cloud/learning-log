@@ -1,0 +1,62 @@
+//c 코드
+#include <svdpi.h>
+#include <malloc.h>
+#include <veriuser.h>
+
+typedef struct{
+unsigned char cnt;
+}c7; //카운트 값을 가지는 구조체 정의
+
+void* counter7_new(){
+    c7* c = (c7*)malloc(sizeof(c7)); // 동적 할당
+    c->cnt = 0; // 구조체 멤버 값 초기화
+    return c // 반환 chandle 은 void*로 주기
+} 
+
+
+void counter7(c7 *inst,
+               svBitVecVal* count,
+               const svBitVecVal* i,
+               const svBit reset,
+               const svBit load){
+if(reset) inst->cnt = 0; //reset
+else if(load) inst->cnt = *i; // load
+else inst->cnt++; //count++
+
+inst->cnt &= 0x7f; // 최상위 비트 mask off 8비트(unsigned char) -> 7비트 변환(bit [6:0])이므로 MSB는 무의미한 값을 가질 수 있음
+*count = inst->cnt;
+io_print("C: count=%d, i=%d, reset=%d, load=%d\n", *count, *i, reset, load);
+}
+
+
+============================
+//sv 코드
+import "DPI-C" function chandle counter7_new();
+import "DPI-C" function chandle counter_7(input chandle inst,
+                                          output bit[6:0] count,
+                                          input bit[6:0] i,
+                                          input bit reset,
+                                          input bit load);
+program automatic counter;
+bit [6:0] o1, o2, i1, i2;
+bit       reset, load. clk;
+chandle   inst1, inst2;
+
+initial begin
+inst1 = counter7_new(); // 생성 필수
+inst2 = counter7_new();
+
+fork
+    forever #10 clk = ~clk; // fork ... join_none 사용으로 함께 작성 가능
+    forever @(posedge clk)begin // 신호 값 조절과 다른 에지에서 실행되게 => 레이스 컨디션 방지
+        counter(inst1, o1, i1, reset, load);
+        counter(inst2, o2, i2, reset, load);
+    end
+join_none
+
+reset = 0; load = 0; i1 = 120; i2 = 10;
+@(negedge clk) load = 1;
+@(negedge clk) load = 0;
+@(negedge clk) $finish;
+end
+endprogram

@@ -1,0 +1,1029 @@
+`define SV_RAND_CHECK(r)\ //매크로 정의 randomize() 실패시 에러 문자
+do begin\
+if(!(r)) begin
+  $display("%s:%0d:Randomization failed\"%s\"",\
+  `_FILE_, `_LINE_, `"r`");\
+  $finish;\
+end\
+end while(0)
+
+`timescale 1ns/1ns
+`define TxPorts 4 // set number of transmit ports
+`define RxPorts 4 // set number of receive ports
+
+module top; // Rx, Tx ports를 위한 인터페이스 배열 정의
+parameter int NumRx = `RxPorts;
+parameter int NumTx = `TxPorts;
+
+logic rst, clk;
+// System Clock and Reset
+initial begin
+    rst = 0; clk = 0;
+    #5ns rst = 1;
+    #5ns clk = 1;
+    #5ns rst = 0; clk = 0;
+    forever
+    #5ns clk = ~clk;
+end
+
+Utopia Rx[0:NumRx-1] ();// NumRx x Level 1 Utopia Rx Interface
+Utopia Tx[0:NumTx-1] ();// NumTx x Level 1 Utopia Tx Interface
+cpu_ifc mif();          // Utopia management interface
+squat #(NumRx, NumTx) squat(Rx, Tx, mif, rst, clk); //DUT
+test #(NumRx, NumTx) t1(Rx, Tx, mif, rst); // TEST (여기는 왜 clk가 없는지?)
+endmodule : top
+
+//tb ifc pass, signal 포트로 전달
+//실제 tb는 환셩 클래스
+// program은 환경의 단계를 거침
+// 높은 추상화 수준에서의 작업을 위해 tb는 인터페이스 안에서만 클로킹 블록 사용 => DUT와 동기화를 위해
+
+program automatic test
+#(parameter int NumRx = 4, parameter int NumTx = 4)
+(Utopia.TB_Rx RX[0:NumRx-1],
+ Utopia.TB_Tx Tx[0:NumTx-1],
+ cpu_ifc.test mif, // Management ifc를 통해 컨트롤 정보 로드(CPU ifc로도 알려짐)
+ input logic rst);
+
+ `include "environment.sv"
+ Enironment env;
+
+ initial begin
+    env = new(Rx, Tx, NumRx, NumTx, mif);
+    env.gen_cfg();
+    env.build();
+    env.run();
+    env.wrap_up();
+ end
+endprogram // test
+
+
+interface cpu_ifc;//// 여기서 이 인터페이스는 VPI를 포워딩 마스크로 매핑하는 룩업 테이블을 로드하는 데에만 사용
+logic        BusMode, Sel, Rd_DS, Wr_RW, Rdy_Dtack;
+logic [11:0] Addr;
+CellCfgType  DataIn, DataOut;
+
+modport Peripheral
+        (input BusMode, Addr, Sel, DataIn, Rd_DS, Wr_RW, 
+         output DataOut, Rdy_Dtack);
+
+modport Test
+        (output BusMode, Addr, Sel, DataIn, Rd_DS, Wr_RW,
+         input DataOut, Rdy_Dtack);
+
+endinterface : cpu_ifc
+
+typedef virtual cpu_ifc.Test vCPU_T;
+
+
+interface Utopia #(IFWidth = 8); 
+// tb가 squat 디자인과 ATM cell을 송수신하며 통신할 떄 사용됨
+// 송수신 path를 위한 클로킹블록, 디자인, tb에 대힌 ifc 모드포트 가짐
+logic [IFWidth-1:0] data;
+bit clk_in, clk_out;
+bit soc, en, clav, valid, ready, reset, selected;
+
+ATMCellType ATMcell; // union of structures for AMT cells
+
+modport TopReceie (
+    input data, soc, clav,
+    output clk_in, reset, ready, clk_out, en, ATMcell, valid );
+
+modport TopTransmit (
+input clav,
+inout selected,
+output clk_in, clk_out, ATMcell, data, soc, en, valid, 
+       reset, ready );
+
+modport CoreReceive (
+    input clk_in, data, soc, clav, ready, reset,
+    output clk_out, en, ATMcell, valid );
+
+modport CoreTransmit (
+    input clk_in, clav, ATMcell, valid, reset,
+    output clk_out, data, soc, en, ready );
+
+clocking cbr @(negedge clk_out);
+input clk_in, clk_out, ATMcell, valid, reset, en, ready;
+output data, soc, clav;
+endclocking : cbr
+modport TB_Rx (clocking cbr);
+
+clocking cbt @(negdege clk_out);
+input clk_out, clk_in, ATMcell, soc, en, valid,
+      reset, data, ready;
+output clav;
+endclocking : cbt
+modport TB_Tx (clocking cbt);
+
+endinterface
+
+typedef virtual Utopia vUtopia;
+typedef virtual Utopia.TB_Rx vUtopiaRx;
+typedef virtual Utopia_TB_Tx vUtopiaTx;
+
+/* 환경 클래스
+테스트벤치 구조를 돕기 위한 비계임
+이 클래스에 layered testbench의 블록을 둠(모니터, 드라이버, 제너레이터, 스코어보드)
+테스트벤치의 4단계의 시퀀싱 조작(randoom configuration 생성, tb_env 빌드, test run and waiting, system/generator 리포트를 닫는 wrap_up phase)*/
+class Environment;
+UNI_generator gen[];
+mailbox gen2drv[];
+event drv2gen[];
+Driver drv[];
+Monitor mon[];
+Config cgf;
+Scoreboard scb;
+Coverage cov;
+virtual Utopia.TB_Rx Rx[];
+virtual Utopia.TB_Tx Tx[];
+int numRx, numTx;
+vCPU_T mif;
+CPU_driver cpu;
+
+extern function new(input vUtopiaRx Rx[],
+                    input vUtopiaTx Tx[],
+                    input int numRx, numTx,
+                    input vCPU_T mif);
+extern virtual function void gen_cfg();
+extern virtual function void build();
+extern virtual task run();
+extern virtual function void wrap_up();
+
+endclass : Environment
+=========================================================================
+//$test$plusargs() 시스템 태스크 사용시 환경 클래스 생성자는 VCS switch +ntb_random_seed를 찾음 (시뮬레이션 랜덤 시트 설정)
+// 시뮬레이터는 다른 시드 설정법을 가질 것임
+// 로그파일에 시드를 출력하는 것은 중요함 -> 테스트 실패시 같은 값으로 다시 시도 가능
+
+function Environment::new(input vUtopiaRx Rx[], //ifc, cfg 초기화
+                          input vUtopiaTx Tx[],
+                          input int numRx, numTx,
+                          input vCPU_T mif);
+this.Rx = new[Rx.size()];
+foreach(Rx[i]) this.Rx[i] = Rx[i];
+this.Tx = new[Tx.size()];
+foreach(Tx[i]) this.Tx[i] = Tx[i];
+this.numRx = numRx;
+this.numTx = numTx;
+this.mif = mif;
+cfg = new(numRx, numTx);
+
+if($test$plusargs("ntb_random_seed")) begin
+    int seed;
+    $value$plusargs("ntb_random_seed = %d", seed);
+    $display("Simulation run with random seed=%0d", seed);
+end
+else
+$display("Simulation run with default random seed");
+endfunction : new
+
+function void Environment::gen_cfg(); //configuration descriptor 랜덤화
+`SV_RAND_CHECK(cfg.randomize());
+cfg.display();
+endfunction : gen_cfg
+=====================================================
+//테스트를 위한 환경 객체 생성
+// 객체들은 모든 채널을 위해 빌드됨
+// 그것들이 사용되지 않을지라도 null handle bug 줄여줌
+function void Enironment::build(); //cpu, gen, drv, gen2drv, drv2gen, scb, cov 초기화
+cpu = new(mif, cgf);
+gen = new[numRx];
+drv = new[numRx];
+gen2drv = new[numRx];
+drv2gen = new[numRx];
+scb = new(cfg);
+cov = new();
+
+foreach(gen[i]) begin // generator build
+    gen2drv[i] = new();
+    gen[i] = new(gen2drv[i], drv2gen[i],
+                 cfg.cells_per_chan[i], i);
+    drv[i] = new(gen2drv[i], drv2gen[i], Rx[i], i);
+end
+
+mon = new[numTx]; 
+foreach(mon[i]) 
+mon[i] = new(Tx[i], i);
+
+begin //스코어보드 - 드라이버/모니터 콜백 연결
+    Scb_driver_cbs sdc = new(scb);
+    Scb_Monitor_cbs smc = new(scb);
+    foreach(drv[i]) drv[i].cbsq.push_back(sdc);
+    foreach(mon[i]) mon[i].cbsq.push_back(smc);
+end
+
+begin //커버리지 모니터 콜백 연결
+    Cov_Monitor_cbs smc = new(cov);
+    foreach(mon[i])
+    mon[i].cbsq.push_back(smc);
+end
+endfunction : build
+=====================================================
+// generators, driers, monitors 트랜잭터 시작
+// 채널은 아직 시작 안 함
+task Environment::run();
+int num_gen_running;
+
+// cpu ifc 가장 먼저 초기화
+cpu.run();
+
+num_gen_running = numRx;
+
+// 각각의 Rx input channel에 대해 generator, driver 시작
+foreach(gen[i]) begin
+    int j = i; //automatic var holds index in spawned thread
+    fork
+        begin
+            if(cfg.in_use_Rx[j])
+            gen[j].run(); //wait for generator to finish
+            num_gen_running--; //decrement driver count
+        end
+        if(cfg.in_use_Rx[j]) drv[j].run();
+    join_none
+end
+//각각의 output Tx channel, 모니터 시작
+foreach(mon[i]) begin
+    int j = i; //  왜 automatic 안 쓰는지?---------------------------------------------------------
+    fork
+    mon[j].run();
+    join_none
+end
+//모든 제너레이터 종료 또는 타임 아웃
+fork : timeout_block
+wait(num_gen_running == 0);
+begin
+    repeat(1_000_000) @(Rx[0].cbr);
+    $display("@%0t: %m ERROR: Generator timeout ", $time);
+    cfg.nErrors++;
+end
+join_any
+disable timeout_block
+
+// wait for the data to flow through switch, into monitors, scoreboard
+repeat(1_000) @(Rx[0].cbr);
+endtask : run
+
+============================
+//post run cleanup / reporting
+function void Environment::wrap_up();
+$display("@%0t: End of sim, %0d errors, %0d warnings",
+         $time, cfg.nErrors, cfg.nWarnings);
+scb.wrap_up();
+endfunction : wrap_up
+
+===============================================================
+// 예상된 값을 스코어보드로 보냄
+class Scb_Driver_cbs extends Driver_cbs;
+Scoreboard scb;
+
+function new(input Scoreboard);
+this.scb = scb;
+endfunction
+//받은 셀을 스코어보드로
+virtual task post_tx(input Driver drv, 
+    input UNI_cell c);
+    scb.save_expected(c);
+endtask
+endclass : Scb_Driver_cbs
+===========================================================
+//모니터 스코어보드 연결
+class Scb_Monitor_cbs extends Monitor_cbs;
+Scoreboard scb;
+
+function new(input Scoreboard scb);
+this.scb = scb;
+endfunction
+//받은 셀을 스코어보드로
+virtual task post_tx(input Monitor mon,
+                    input NNI_cell c);
+scb.check_actual(c, mon.PortID);
+endtask
+endclass : Scb_Monitor_cbs
+
+========================================
+// 모니터 커버리지 콜백 연결
+class Cov_Monitor_cbs extends Monitor_cbs;
+Coverage cov;
+
+function new(input Coverage cov);
+this.cov = cov;
+endfunction
+
+virtual task post_tx(input Monitor  mon,
+                     input NNI_cell c);
+CellCfgType CellCfg = top.squat.lut.read(c.VPI);
+cov.sample(mon.PortID, CellCfg.FWD);
+endtask
+endclass : Cov_Monitor_cbs
+=================================================
+/*
+랜덤 설정 헤더
+nCells(시스템을 흐르는 셀의 전체 값을 위한 랜덤 값) 으로 시작
+제약 c_nCells_valid는 유효 셀의 수가 0보다 큼을 보장
+c_nCells_reasonable은 테스트를 합리적인 수로 제한(1000셀) 테스트에서 무효, 덮어쓰기 가능 
+
+다이나믹 비트 배열 in_use_Rx 어떤 스위치로의 Rx 채널이 활성화됐는지 명시 run에 사용되어 활성화된 채널만 실행되게 함
+
+배열 cells_per_chan 활성된 채널에 총 cell의 수를 랜덤하게 나눔
+제약 zero_unused_channels는 비활성 채널에 대해 cell의 수를 0으로 설정
+solver를 돕기 위해, 활성된 채널의 마스크는 채널 사이에 cell들을 나누기 전 먼저 해결
+=> 아니면 cell의 수가 0으로 할당됐던 채널들만 비활성될 것임
+*/
+
+class Config;
+int nErrors, nWarnings; //에러, 경고 수
+bit [31:0] numRx, numTx; //copy of parameters
+
+rand bit [31:0] nCells;  //total cells 0 < <1000
+constraint c_nCells_valid
+{  nCells > 0; }  
+constraint c_nCells_reasonable
+{  nCells < 1000; }
+
+rand bit in_use_Rx[]; //input / output channel enabled
+constraint c_in_use_valid
+{   in_use_Rx.sum() > 0; } // 최소 1개
+
+rand bit [31:0] cells_per_chan[];
+constraint c_sum_ncells_sum // 전체 채널에 cell 나눔
+{  cells_per_chan.sum() == nCells; }  // total number of cells
+
+constraint zero_unused_channels  // 사용하지 않는 채널의 셀은 0으로 설정
+{foreach(cells_per_chan[i]) 
+{
+    solve in_use_Rx[i] before cells_per_chan[i];
+    if(in_use_Rx[i])
+    cells_per_chan[i] inside {[1:nCells]};
+    else cells_per_chan[i] == 0;
+}
+}
+
+extern function new(input bit [31:0] numRx, numTx);
+extern virtual function void display(input string prefix ="");
+endclass : Config
+
+
+typedef struct packed { // 셀 재작성 및 구성 전달 타입
+    bit [`TxPorts-1 : 0] FWD;
+    bit [11:0] VPI;
+} CellCfgType;
+
+function Config::new(input bit[31:0] numRx, numTx); //다이나믹 배열 크기 설정
+this.numRx = numRx;
+in_use_Rx = new[numRx];
+this.numTx = numTx;
+cells_per_chan = new[numRx];
+endfunction
+
+function void Config::display(input string prefix);  // 채널별 할당된 셀 및 활성화된 포트 번호 출력
+$write("%sConfig: numRx=%0d, numTx=%0d, nCells=%0d (",
+       prefix, numRx, numTx, nCells);
+foreach(cells_per_chan[i])
+       $write("%0d ", cells_per_chan[i]); 
+$write("), enabled RX: ",prefix);
+foreach(in_use_Rx[i]) if (in_use_Rx[i]) $write("%0d ", i);
+$display;
+endfunction 
+
+// ATM 스위치는 UNI 형식 셀을 받고 NNI 형식 셀을 보냄(이 셀들은 OOP TB, 구조적 디자인으로 보내짐) => typedef로 정의
+// 두 형식의 가장 큰 차이점은 UNI 형식의 GFC, VPI필드가 NNI의 VPI로 병합된다는 것임
+
+typedef struct packed {
+    bit         [3:0]  GFC;
+    bit         [7:0]  VPI;
+    bit         [15:0] VCI;
+    bit                CLP;
+    bit         [2:0]  PT;
+    bit         [7:0]  HEC;
+    bit  [0:47] [7:0]  Payload;
+} uniType;
+
+typedef struct packed{
+    bit         [11:0] VPI;
+    bit         [15:0] VCI;
+    bit                CLP;
+    bit         [2:0]  PT;
+    bit         [7:0]  HEC;
+    bit  [0:47] [7:0]  Payload;
+} nniType;
+
+typedef union packed { //보편적 타입 형성을 위해 바이트 메모리와 함께 병합됨
+    uniType uni;
+    nniType nni;
+    bit [0:52] [7:0] Mem;
+} ATMCellType; 
+
+=====================================
+class UNI_cell extends BaseTr; //constrained random ATM cell
+rand bit         [3:0]  GFC;
+rand bit         [7:0]  VPI;
+rand bit         [15:0] VCI;
+rand bit                CLP;
+rand bit         [2:0]  PT;
+rand bit         [7:0]  HEC;
+rand bit  [0:47] [7:0]  Payload;
+
+static bit [7:0] syndrome [0:255];
+static bit syndrome_not_generated = 1;
+
+extern function new();
+extern function void post_randomize();
+extern virtual function bit compare(input BaseTr to);
+extern virtual function void display(input string prefix = "");
+extern virtual function BaseTr copy(input BaseTr to = null);
+extern virtual function void pack(output ATMCellType to);
+extern virtual function void unpack(input ATMCellType from);
+extern function NNI_cell to_NNI();
+extern function void generate_syndrome();
+extern function bit [7:0] hec (bit [31:0] hdr);
+endclass : UNI_cell
+
+function UNI_cell::new();
+if(syndrome_not_generated)
+generate_syndrome();
+endfunction
+
+function void UNI_cell::post_randomize();
+HEC = hec({GFC, VPI, VCI, CLP, PT});
+endfunction
+
+function bit UNI_cell::compare(input BaseTr to);
+UNI_cell c;
+$cast(c, to);
+if (this.GFC != c.GFC)           return 0;
+if (this.VPI != c.VPI)           return 0;
+if (this.VCI != c.VCI)           return 0;
+if (this.CLP != c.CLP)           return 0;
+if (this.PT != c.PT)             return 0;
+if (this.HEC != c.HEC)           return 0;
+if (this.Payload != c.Payload)   return 0;
+return 1;
+endfunction
+
+function void UNI_cell::display(input string prefix = "");
+ATMCellType p;
+
+$display("%sUNI id:%0d GFC=%x, VPI=%x, VCI=%x, CLP=%b, PT=%x, HEC=%x, Payload[0]=%x",
+prefix, id, GFC, VPI, VCI, CLP, PT, HEC, Payload[0]);
+this.pack(p);
+$write("%s",prefix);
+foreach(p.Mem[i]) $write("%x ",p.Mem[i]);
+$display;
+endfunction
+
+function BaseTr UNI_cell::copy(input BaseTr to = null);
+if (to == null) copy.new();
+else            $cast(copy, to);
+copy.GFC         = this.GFC;
+copy.VPI         = this.VPI; 
+copy.VCI         = this.VCI; 
+copy.CLP         = this.CLP; 
+copy.PT          = this.PT;
+copy.HEC         = this.HEC;
+copy.Payload     = this.Payload;
+return copy;
+endfunction
+
+function void UNI_cell::pack(output ATMCellType to); // 이 객체의 프로퍼티들을 바이트 배열로
+to.uni.GFC         = this.GFC;
+to.uni.VPI         = this.VPI; 
+to.uni.VCI         = this.VCI; 
+to.uni.CLP         = this.CLP; 
+to.uni.PT          = this.PT;
+to.uni.HEC         = this.HEC;
+to.uni.Payload     = this.Payload;
+endfunction
+
+function void UNI_cell::unpack(input ATMCellType from); // 바이트 배열을 이 객체로 언팩
+this.GFC           = from.uni.GFC;
+this.VPI           = from.uni.VPI;
+this.VCI           = from.uni.VCI;
+this.CLP           = from.uni.CLP;
+this.PT            = from.uni.PT;
+this.HEC           = from.uni.HEC;
+this.Payload       = from.uni.Payload;
+endfunction
+
+function NNI_cell UNI_cell::to_NNI(); // 유니셀로부터 NNI 셀 생성 스코어보드에 씀
+NNI_cell copy;
+copy = new();
+copy.VPI         = this.VPI; 
+copy.VCI         = this.VCI; 
+copy.CLP         = this.CLP; 
+copy.PT          = this.PT;
+copy.HEC         = this.HEC;
+copy.Payload     = this.Payload;
+return copy;
+endfunction
+
+function void UNI_cell::generate_syndrome(); // HEC 계산에 이용되는 신드롬 배열 생성
+bit [7:0] sndrm;
+for (int i = 0; i < 256 ; i = i + 1) begin
+    sndrm = i;
+    reapeat(8) begin
+        if(sndrm[7] === 1'b1)
+        sndrm = (sndrm << 1) ^ 8'h07;
+        else
+        sndrm = sndrm << 1;
+    end
+    syndrome[i] = sndrm;
+end
+syndrome_not_generated = 0;
+endfunction
+
+function bit [7:0] UNI_cell::hec(bit [31:0] hdr); // 이 객체를 위한 HEC 값 계산
+hec = 8'h00;
+repeat(4) begin
+    hec = syndrome[hec ^ hdr[31:24]];
+    hdr = hdr << 8;
+end
+hec = hec ^ 8'h55;
+endfunction
+
+//NNI 클래스는 UNI 클래스와 거의 동일 (GFC 필드나 UNI_CELL로 전환하는 메서드가 없는 것 빼고)
+
+// 유니셀 랜덤 생성기 - 유니셀 객체의 블루 프린트 랜덤화, 셀의 복사본을 드라이버로
+
+class UNI_generator;
+UNI_cell blueprint;
+mailbox  gen2drv;
+event    drv2gen;
+int      nCells;
+int      PortID;
+
+function new(input mailbox gen2drv,
+             input event drv2gen,
+             input int nCells, PortID);
+this.gen2drv = gen2drv;
+this.drv2gen = drv2gen;
+this.nCells = nCells;
+this.PortID = PortID;
+blueprint = new();
+endfunction
+
+task run();
+UNI_cell c;
+repeat(nCells) begin
+    `SV_RAND_CHECK(blueprint.randomize());
+    $cast(c, blueprint.copy());
+    c.display($sformat("@%0t: Gen%0d: ", $time, PortID));
+    gen2drv.put(c);
+    @drv2gen; //wait for driver to finish with it
+end
+endtask
+
+endclass : UNI_generator
+
+// 유니셀을 ATM 스위치로 보내는 드라이버 클래스
+// 드라이버 콜백 사용함 순환관계 존재함
+// 드라이버 클래스는 드라이버 콜백 객체의 큐 가짐
+// 드라이버 콜백의 전/후 tx메서드는 드라이버 객체로 전달됨
+// 두 클래스 컴파일 시 드라이버 콜백 정의 전 typedef class Driver이 필요하거나 그 반대로
+
+typedef class Driver_cbs;
+
+class Driver;
+
+mailbox gen2drv;
+event drv2gen;
+vUtopiaRx Rx;
+Driver_cbs cbsq[$];
+input PortID;
+
+extern function new(input mailbox gen2drv,
+                    input event drv2gen,
+                    input vUtopiaRx Rx,
+                    input int PortID);
+
+extern task run();
+extern task send (input UNI_cell c);
+
+endclass
+
+function Driver::new(input mailbox gen2drv,
+                    input event drv2gen,
+                    input vUtopiaRx Rx,
+                    input int PortID);
+this.gen2drv = gen2drv;
+this.drv2gen = drv2gen;
+this.Rx = Rx;
+this.PortID = PortID;
+endfunction
+
+task Driver::run(); // 발생기에서 트랜잭션 받아서 DUT로
+UNI_cell c;
+bit drop = 0;
+
+//포트 초기화
+Rx.cbr.data <= 0;
+Rx.cbr.soc  <= 0;
+Rx.cbr.clav <= 0;
+
+forever begin
+    gen2drv.peek(c); //메일 박스의 앞에서 셀 읽기
+    begin: Tx  //전 전송 콜백
+    foreach(cbsq[i]) begin
+        cbsq[i].pre_tx(this, c, drop);
+        if(drop) disable Tx; // 이 셀 보내지 마
+    end
+
+    c.display($sformat("@%0t: Drv%0d: ", $time, PortID));
+    send(c);
+    foreach(cbsq[i])// 후 전송 콜백
+    cbsq[i].post_tx(this, c);
+    end : Tx
+
+    gen2drv.get(c);
+    ->drv2gen; //uni_generator에게 끝났다고 알림
+end
+endtask
+
+task Driver::send(input UNI_cell c);
+ATMCellType Pkt;
+
+c.pack(Pkt);
+$write("Sending cell: ");
+foreach(Pkt.Mem[i])
+$write("%x ", Pkt.Mem[i]); $display;
+
+@(Rx.cbr);
+Rx.cbr.clav <= 1;
+for(int i=0; i <= 52; i++)begin
+    while (Rx.cbr.en === 1'b1) @(Rx.cbr); // enable 아니면 루프
+    //Assert start of cell, assert enable, send byte 0 (i==0)
+    Rx.cbr.soc <= (i == 0);
+    Rx.cbr.data <= Pkt.Mem[i];
+    @(Rx.cbr);
+end
+Rx.cbr.soc <= 'z;
+Rx.cbr.data <= 8'bx;
+Rx.cbr.clav <= 0;
+endtask
+===================================================
+//셀 전송 전후에 호출되는 간단한 콜백들을 가진 드라이버 콜백 클래스
+// 기본적으로 사용되는 빈 태스크 가짐
+// 테스트 케이스는 드라이버 코드 수정 없이 드라이버에 새 행동을 넣기 위해 이 클래스 확장 가능함
+
+typedef class Driver;
+
+class Driver_cbs;
+virtual task pre_tx(input Driver drv,
+                    input UNI_cell c,
+                    input bit drop);
+endtask
+
+virtual task post_tx(input Driver drv,
+                    input UNI_cell c);
+endtask
+endclass
+==================================================
+// 모니터 클래스는 셀을 받은 후 호출되는 간단한 콜백을 가짐
+
+typedef class Monitor;
+
+class Monitor_cbs;
+virtual task post_rx(input Monitor mon,
+                     input NNI_cell c);
+endtask
+endclass
+
+=========================================
+// 모니터 클래스 역시 순환 컴파일 의존성을 방지하기 의해 타입정의 사용
+
+typedef class Monitor_cbs;
+
+class Monitor;
+
+vUtopiaTx Tx;
+Monitor_cbs cbsq[$];
+bit [1:0] PortID;
+
+extern function new(input vUtopiaTx Tx, input int PortID);
+extern task run();
+extern task receive(output NNI_cell c);
+endclass
+
+function Monitor::new(input vUtopiaTx Tx, input int PortID);
+this.Tx = Tx;
+this.PortID = PortID;
+endfunction
+
+task Monitor::run();
+NNI_cell c;
+
+forever begin
+    receive(c);
+    foreach(cbsq[i])
+    cbsq[i].post_rx(this,c);
+end
+endtask
+
+task Monitor::receive(output NNI_cell c);
+ATMCellType Pkt;
+
+Tx.cbt.clav <= 1;
+while(Tx.cbt.soc !== 1'b1 || Tx.cbt.en !== 1'b0)
+@(Tx.cbt);
+for(int i = 0; i <= 52; i++) begin
+    while(Tx.cbt.en !== 1'b0) @(Tx.cbt);
+
+    Pkt.Mem[i] = Tx.cbt.data;
+    @(Tx.cbt);
+end
+
+Tx.cbt.clav <= 0;
+
+c = new();
+c.unpack(Pkt);
+c.display($sformat("@%0t: Mon%0d: ", $time, PortID));
+endtask
+
+/* 스코어보드는 드라이버에서 save_expect함수를 통해 예상된 셀 받고 실제 셀은 모니터로부터 check_actual 함수를 통해 받음
+save_expected는 콜백 Sdb_Driver_cbs의 post_tx에서 호출됨
+check_actual은 Scb_Monitor_cbs::post_rx() 에서 호출됨*/
+
+class Expect_cells;
+NNI_cell q[$];
+int iexpect, iactual;
+endclass
+
+class Scoreboard;
+Config cfg;
+Expect_cells expect_cells[];
+NNI_cell cellq[$];
+int iexpect, iactual;
+
+extern function new(Config cfg);
+extern virtual function void wrap_up();
+extern function void save_expectes(UNI_cell ucell);
+extern function void check_actual (input NNI_cell c,
+                                   input int portn);
+extern function void display(string prefix="");
+endclass
+
+function Scoreboard::new(Config cfg);
+this.cfg = cfg;
+expect_cells = new[NumTx]; // 여기에는 왜 num 말고 Num 쓰는지?
+foreach(expect_cells[i])
+expect_cells[i] = new();
+endfunction
+
+
+function void Scoreboard::save_expectes(UNI_cell ucell);
+NNI_cell ncell = ucell.to_NNI;
+CellCfgType CellCfg = top.squat.lut.read(ncell.VPI);
+
+$display("@%0t: Scb save: VPI=%0x, Forward=%b",
+           $time, ncell.VPI, CellCfg.FWD);
+ncell.display($sformat("@%0t: Scb save: ", $time));
+
+for(int i=0; i <NumTx; i++) // 이 셀이 보내질 모든 Tx ports 위치 찾기
+if(CellCfg.FWD[i]) begin
+    expect_cells[i].q.push_back(ncell);
+    expect_cells[i].iexpect++;
+    iexpect++;
+end
+endfunction
+
+function void Scoreboard::check_actual (input NNI_cell c,
+                                        input int portn);
+NNI_cell match;
+int match_idx;
+
+c.display($sformat("@%0t: Scb check: ", $time));
+
+if(expect_cells[portn].q.size() == 0) begin
+    $display("@%0t: ERROR: %m cell not found, SCB TX%0d empty", $time, portn);
+    c.disply("Not Found: ");
+    cfg.nErrors++;
+    return;
+end
+
+expect_cells[portn].iactual++;
+iactual++;
+
+foreach(expect_cells[portn].q[i]) begin
+if(expect_cells[portn].q[i].compare(c)) begin
+    $display("@%0t: Match found for cell", $time);
+    expect_cells[portn].q.delete(i);
+    return
+end
+end
+
+$display("@%0t: ERROR: %m cell not found", $time);
+c.display("Not Found: ");
+cfg.nErrors++;
+endfunction
+
+function void Scoreboard::wrap_up();
+//print end of simulation report
+$display("@%0t: %m %0d expected cells, %0d actual cells rcvd", $time, iexpect, iactual);
+
+//Look for leftover cells
+foreach(expect_cells[i]) begin
+    if(expect_cells[i].q.size()) begin
+        $display("@%0t: %m cells in SCB Tx[%0d] at end of test", $time, i);
+        this.display("Unclaimed: ");
+        cfg.nErrors++;
+    end
+end
+endfunction
+
+//print the contents of the scoreboard, mainly for debugging
+function void Scoreboard::display(string prefix="");
+$display("@%0t: %m so far %0d expected cells, %0d actual rcvd", $time, iexpect, iactual);
+
+foreach(expect_cells[i]) begin
+    $display("Tx[%0d]: exp=%0d, act=%0d", i, expected_cells[i].iexpect, expect_cells[i].iactual);
+foreach(expected_cells[i].q[j])
+expected_cells[i].q[j].display($sformat("%sScoreboard: Tx%0d: ", prefix, i));
+end
+endfunction
+
+======================
+//기능적 커버리지 수집에 이용하는 클래스 커버리지는 오직 단일 클래스 안에서 데이터를 보므로 
+//커버그룹은 커버리지 클래스 안에서 정의되고 인스턴스화 
+// 데이터 값은 클래스의 sample메서드로 읽혀진 후 커버그룹의 sample메서드는 값을 기록하기 위해 호출됨
+
+class Coverage;
+bit [1:0] src;
+bit [NumTx-1:0] fwd;
+
+covergroup CG_Forward;
+coverpoint src
+{bins src[] = {[0:3]};
+ option.weight = 0;}
+ coverpoint fwd
+ {bins fwd[] = {[1:15]};
+ option.weight = 0;}
+ cross src, fwd;
+endgroup
+
+function new();
+CG_Forward = new(); //embeded 이므로 여기서 생성
+endfunction
+
+function void sample(input bit [1:0] src,
+                     input bit [NumTx-1:0] fwd);
+$display("@%0t: Coverage: src=%d. FWD=%b", $time, src, fwd);
+this.src = src;
+this.fwd = fwd;
+CG_Forward.sample();
+endfunction
+endclass 
+
+==========================================
+// CPU interface를 구동하기 위한 메서드를 포함하는 CPU_Driver 클래스
+
+class CPU_driver;
+vCPU_T mif;
+CellCfgType lookup [255:0]; //룩업 테이블 복사본
+Config cfg;
+bit [NumTx-1:0] fwd;
+
+extern function new(vCPU_T mif, Config cfg);
+extern task Initialize_Host();
+extern task HostWrite(int a, CellCfgType d);
+extern task HostRead (int a, output CellCfgType d);
+extern task run();
+endclass
+
+function CPU_driver::new(vCPU_T mif, Config cfg);
+this.mif = mif;
+this.cfg = cfg;
+endfunction
+
+task CPU_driver::Initialize_Host();
+mif.BusMode <= 1;
+mif.Addr <= 0;
+mif.DataIn <= 0;
+min.Sel <= 1;
+mif.Rd_DS <= 1;
+mif.Wr_RW <= 1;
+endtask
+
+task CPU_driver::HostWrite(int a, CellCfgType d);
+#10 mif.Addr <= a; mif.DataIn <= d; mif.Sel <= 0;
+#10 mif.Wr_RW <= 0;
+while(mif.Rdy_Dtack !== 0) #10;
+#10 mif.Wr_RW <= 1; mif.Sel <= 1;
+while(mif.Rdy_Dtack==0) #10;
+endtask
+
+task CPU_driver::HostRead (int a, output CellCfgType d);
+#10 mif.Addr <= a; mif.Sel <= 0;
+#10 mif.Rd_DS <= 0;
+while (mif.Rdy_Dtack!==0) #10;
+#10 d = mif.DataOut; mif.Rd_DS <= 1; mif.Sel <= 1;
+while (mif.Rdy_Dtack==0) #10;
+endtask
+
+task CPU_driver::run();
+CellCfgType CellFwd;
+Initialize_Host();
+//configure through Host interface
+repeat(10) @(negdege clk);
+$write("Memory: Loading ... ");
+for(int i=0;i<=255;i++) begin
+    CellFwd.FWD = $urandom();
+`ifdef FWDALL
+CellFwd.FWD = '1
+`endif 
+CellFwd.VPI = i;
+HostWrite(i, CellFwd);
+lookup[i] = CellFwd;
+end
+
+//verify memory
+$write("Veriying ...");
+for(int i=0; i <=255; i++) begin
+    HostRead(i, CellFwd);
+    if(lookup[i] != CellFwd) begin
+        $display("FATAL, Mem Loc 0x%x contains 0x%x, expected 0x%x",
+                   i, CellFwd, lookup[i]);
+                   $finish;
+    end
+end
+$display("Verified");
+
+endtask
+
+
+===================================
+Alternate tests
+검증 동안 많은 테스트를 생성할 것임(테스트할 주요 기능에 따라) 각 테스트는 다른 시드로 실행될 수 있음
+
+3-1 Your First Test - Just One Cell
+Config 클래스를 확장 후 새 객체를 랜덤화 전 환경에 넣어 새 제약 추가 가능함
+아 태스트가 한 번 작동하면, 두 개의 셀을 시도할 수 있으며 이후 긴 시퀀스를 실행할 셀의 수에 대한 제약을 다시 작성한다.
+
+program automatic test
+#(parameter int NumRx = 4, parameter int NumTx = 4) 
+(Utopia.TB_RX Rx[0:NumRx-1],
+ Utopia.TB_TX Tx[0:NumTx-1],
+ cpu_ifc.Test mif,
+ input logic rst, clk);
+
+ `include "environment.sv"
+ Environment env;
+
+ class Config_1_cell extends Config;
+ constraint one_cell {nCells == 1;}
+
+ function new(input int NumRx, NumTx);
+ super.new(NumRx, NumTx);
+ endfunction
+ endclass
+
+ initial begin // Just simulate for 1 cell
+    env = new(Rx, Tx, NumRx, NumTx, mif);
+
+    begin
+        Config_1_cell c1 = new(NumRx,NumTx);
+        env.cfg = c1;
+    end
+
+    env.gen_cfg(); //Config will have just 1 cell -> randomize()는 핸들이 현재 가리키고 있는 객체를 기준으로 적용됨
+    env.build();
+    env.run();
+    enf.wrap_up();
+ end
+
+endprogram // test
+
+// 때때로 cell을 드롭하는 에러를 생성하는 테스트
+// 드롭 비트를 세트하는 드라이버를 위한 콜백을 만들어야 함
+// 그 후 테스트에서 새 기능을 넣기(빌드 단계동안 드라이버 클래스가 생성된 이후에)
+
+program automatic test
+#(parameter int NumRx = 4, parameter int NumTx = 4)
+(Utopia.TB_RX Rx[0:NumRx-1],
+ Utopia.TB_TX Tx[0:NumTx-1],
+ cpu_ifc.Test mif,
+ input logic rst, clk);
+
+ `include "environment.sv"
+ Environment env;
+
+ class Driver_cbs_drop extends Driver_cbs;
+ virtual task pre_tx(input ATM_cell cell, ref bit drop);
+ drop = ($urandom(0,99) == 0);
+ endtask
+ endclass
+
+ initial begin
+    env = new(Rx, Tx, NumRx, NumTx, mif);
+    env.gen_cfg();
+    env.build();
+
+    begin                           //에러 주입 콜백 생성
+        Driver_cbs_drop dcd = new();
+        env.drv.cbs.push_back(dcd); //드라이버 큐에 put
+    end
+
+    env.run();
+    env.wrap_up();
+ end
+
+endprogram 

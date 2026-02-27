@@ -1,0 +1,75 @@
+class Punct_stream { //istream 과 비슷하나 사용자가 공백 문자 지정 가능
+public:
+	Punct_stream(istream& is) //문자를 입력받은 istream을 인자로 받아 source라는 이름으로 저장하고 스트림이 기본적으로 대/소문자를 구별하지 않게 설정
+		:source{ is }, sensitive{ true } {
+	}
+
+	void whitespace(const string& s)  //s를 공백문자 집합으로 지정
+	{
+		white = s;
+	}
+
+	void add_white(char c) { white += c; } // 공백 문자 집합에 추가
+	bool is_whitespace(char c); //c가 공백 문자 집합에 포함되는가?
+
+	void case_sensitive(bool b) { sensitive = b; }
+	bool is_case_sensitive() { return sensitive; }
+
+	Punct_stream& operator>>(string& s);
+	operator bool(); // 이 객체를 bool로 변환하는 연산자 정의, 반환형은 직접 안 씀, 반환 타입은 연산자 이름 자체에 포함
+
+private:
+	istream& source; //문자 입력 출처
+	istringstream buffer; //버퍼를 이용해 형식화 수행
+	string white; //공백 문자로 취급할 문자
+	bool sensitive; // 스트림이 대/소문자를 구별하는가?
+};
+
+bool Punct_stream::is_whitespace(char c) {
+	for (char w : white)
+		if (c == w) return true;
+	return false;
+}
+
+Punct_stream& Punct_stream::operator>>(string& s) {
+	while (!(buffer >> s)) { // buffer에 문자가 남아있으면 s로 옮기고 다시 실행 없으면 source에서 다시 채움
+		if (buffer.bad() || !source.good()) return *this; // buffer가 bad상태거나 source 상태가 않좋으면 포기, getline으로 읽고 상태확인 없었으나 여기서 확인해 커버
+		buffer.clear(); //버퍼 상태 재설정 및 채우기 -> 버퍼에 읽을 게 더 이상 없을 때(대부분 eof) 수행되므로 상태 재설정함
+
+		string line;
+		getline(source, line);
+
+		for (char& ch : line)
+			if (is_whitespace(ch))
+				ch = ' '; // 공백으로 처리할 문자인가?
+			else if (!sensitive)
+				ch = tolower(ch); //문자열을 소문자로
+
+		buffer.str(line);//문자열을 스트림에 넣음, istringstream 타입의 buffer의 string을 line으로 설정
+	}
+	return *this;
+}
+
+
+Punct_stream::operator bool() { // Punct_stream을 bool 타입으로 변환 해줌 while(ps >> s) 와 같이 조건식으로 사용할 수 있도록
+	return (!(source.bad() || source.fail()) && source.good()); //good일 때만 true 나머지는 bad
+}
+
+int main() {
+	//주어진 텍스트 입력에서 구두점과 대/소문자 차이를 무시한
+	//모든 단어를 정렬한 목록 생성
+	//중복된 단어는 출력에서 제외
+
+	Punct_stream ps{ cin }; // ps가 cin으로부터 입력 받음
+	ps.whitespace(";:,.?!()\"{}<>/&$@#%^*|~"); 
+	ps.case_sensitive(false); // 대소문자를 구별하지 않음
+
+	cout << "단어 입력\n";
+	vector <string> vs;
+	for (string word; ps >> word;)
+		vs.push_back(word);
+
+	sort(vs.begin(), vs.end());//사전 순 정렬
+	for (int i = 0; i < vs.size(); ++i)
+		if (i == 0 || vs[i] != vs[i - 1])cout << vs[i] << "\n"; //입력 단어를 정렬한 목록 생성, 연속된 단어는 한 번만 출력
+}

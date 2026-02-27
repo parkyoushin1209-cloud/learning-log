@@ -1,0 +1,108 @@
+class Transaction;
+bit [3:0] kind;
+bit [2:0] dst;
+endclass
+
+Transaction tr;
+
+1. sv가 커버포인트를 위한 bins 자동 생성, 정의역 보고 치역 결정(n bit-> 2^n)
+2. 자동으로 생성되는 빈의 수 제한(기본 64bins) => 자동으로 생성된 수 많은 빈 속에서 누락된 핵심 지점을 찾기 어려워 비효율적
+coverpoint tr.dst{
+option.auto_bin_max = 2; // 빈수를 두 개로 설정 빈 당 2^3/2 = 4 개의 값 저장
+}
+3. 표현 샘플링
+표현도 샘플링 가능 but 원하는 값을 얻고 있나 확인을 위해 커버리지 리포트 항상 체크
+class Packet;
+rand bit [2:0] hdr_len;
+rand bit [3:0] payload_len;
+rand bit [3:0] kind;
+endclass
+
+Packet p;
+
+covergroup CovLen5;
+len16 : coverpoint(p.hdr_len + payload_len); // 3bit + 4bit value = 4bit value
+len32 : coverpoint(p.hdr_len + payload_len + 5'b0); // 5'b0를 사용해 5bit로 정밀도 설정
+endgroup
+
+4. 사용자 정의 bins
+계산된 표현 너비가 전부 필요하지 않다면 축소시켜서 커버리지 100%가 가능하도록 하기
+covergroup CovLen16;
+len : coverpoint (p.hdr_len + p.payload_len + 5'b0)
+{bins len[] = [0:22]} //3비트 8 + 4비트 16 = 24이므로 [0:23]으로 계산 하지 않기 [0:7] + [0:15] => 0 + 7 + 15로 생각
+endgroup
+
+5. 조건적 커버리지
+리셋동안 커버리지를 꺼서 의도치 않은 트리거 무시되게함
+covergroup CovDst21;
+coverpoint tr.dst.iff(!bus_if.rst);
+endgroup
+
+또는 stop, start 사용
+initial begin
+CovDst22 ck = new();
+#1ns sk.stop();
+bus_if.rst <= 1;
+
+#100ns bus_if.rst <= 0;
+ck.start();
+...
+end
+
+
+6. 열거형 타입을 위한 bin 생성
+여러 값을 하나의 빈에 넣고 싶으면 스스로 bin 정의
+열거형 값 밖에 있는 어떠한 bins들도 무시(default 사용 안 하는 이상)
+열거형 타입의 커버리지 수집 시 auto_bin_max 적용 안됨
+typedef enum{INIT, DECODE, IDLE} fsmstate_e;
+fsmstate_e pstate, nstate;
+covergroup CovFsm23;
+coverpoint pstate;
+endgroup
+
+
+7. transition coverage
+어떤 길이의 천이도 명시 가능하나 천이의 각 상태에서 한 번만 샘플됨
+(0 => 1 => 1 => 1 => 2) != (0 => 1= > 2) 임 반복의 경우 1[*2] 처럼 표현 1[*3:5]는 3~5중 하나여도 됨
+(0,1 => 2, 3) 처럼 여러 전이도 명시 가능 () 안 상태를 전부 돌아야 hit + 1 됨
+covergroup CovDst25;
+coverpoint tr.dst{
+    bins t1 = (0=>1) , (0 => 2), (0 = > 3);
+}
+endgroup
+
+8. wildcard 상태, 전이
+bit [2:0] dst;
+covergroup CovDst26;
+coverpoint tr.dst{
+    wildcard bins even = {3'b??0}; //000, 010, 100, 110
+    wildcard bins odd = {3'b??1};  //001, 011, 101, 111
+}
+endgroup
+
+9.ingoring values
+3bit 변수가 값을 0~5까지만 갖는 경우 커버리지 75%가 최대 => ignore_bins 사용
+covergroup CovDst27;
+coverpoint tr.dst{
+    ignore_bins hi = {6,7}; // 6,7은 무시 커버리지 계산에 안 쓰임
+}
+endgroup
+
+
+10.illegal bins
+몇몇 샘플된 값은 무시되거나 에러를 초래할 수도 있어야 함 => illegal_bins 이용
+테스트의 에러 체크가 놓친 상태를 잡는데 사용
+또한 bin 생성의 정확도 더블 체크가능
+커버그룹에 의해 불법적 값이 발견되면 테스트벤치, bin 정의 문제임
+covergroup CovDst29;
+coverpoint tr.dst{
+    illegal_bins hi = {6,7}; // 발견되면 에러 발생
+}
+endgroup
+
+11. state machine coverage
+상태머신 bin을 사용해 상태, 전이 리스트로 표현 가능(!= 상태머신 커버리지 측정을 위해 기능적 커버리지를 이용해야만 함)
+코드 커버리지 툴 이용 시 (상태, 상태레지스터, 화살표 자동 추출 가능한 실수 방지할 수 있게 해줌)
+자동화 툴의 경우 실수가 있어도 코드 그대로 정확히 정보 추출
+작고 중요한 상태머신의 경우 기능적 커버리지를 이용해 수동으로 모니터링 하는게 좋음
+

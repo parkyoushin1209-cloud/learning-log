@@ -1,0 +1,87 @@
+class Transactor;
+Transaction tr;
+mailbax #(Transaction) mbx;
+
+covergroup ConDst5; //Embeded covergroup
+coverpoint tr.dst;
+endgroup
+
+function new(input mailbox #(Transaction) mbx);
+ConDst5 = new(); //생성자에거 커버그룹 생성, 여기서 생성해야 함
+this.mbx = mbs;
+endfunction
+
+task run();
+forever begin
+    mbx.get(tr);
+    @(ifc.cb);
+    ifc.cb.dst <= tr.dst;
+    ifc.cb.data <= tr.data;
+    ConDst5.sample(); // 커버리지 수집
+end
+endtask
+endclass
+
+
+커버그룹 트리거
+기능적 커버리지의 메이저 파트는 샘플된 데이터 값, 샘플링 되는 시간임
+sample 함수로 직접적으로 트리거는 다음의 경우 이용 
+1. 절차적 코드에서 명시적으로 트리거 원할 때
+2. 언제 샘플되야 할지 알려주는 신호/이벤트가 없을 때
+3. 독립적으로 트리거돼야 하는 여러 인스턴스가 존재할 때
+
+커버리지 이벤트는 다음의 경우 이용
+기존 이벤트, 신호를 활용해 커버리지 트리거 하고 싶을 때
+
+커버그룹 트리거 방법
+콜백 이용
+언제 어디서든 쉽게 hook 추가 가능 => 
+커버리지 수집 시점 제한 없이 유연한 테스트벤치 생성 가능
+커버리지 객체를 테스트벤치에 연결에 메일 박스보다 뛰어나므로 콜백 이용하기
+
+마찬가지로 빌드 ~ run 사이에 객체 생성 후 큐에 넣기
+콜백객체 샘플링은 post_tx에서 실행
+
+
+
+----------------------------
+
+// 자신만의 인자 리스트를 가진 샘플 메서드 사용법, 커버그룹이 클래스의 밖에 정의돼 있을 때만 가능
+covergroup Covdst with function sample(bit[2:0]dst, bit hs); //with~~ 추가
+coverpoint dst;
+coverpoint hs;
+endgroup
+
+Covdst covdst;
+covdst.sample(tr.dst, high_speed); // 샘플 메서드에 인자 추가
+
+//이벤트 트리거를 가진 커버 그룹
+event trans_ready;
+covergroup CovDst9 @(trans_ready); //이벤트에 맞춰 샘플링
+coverpoint ifc.db.dst;
+endgroup
+
+module mem(sinple_bus sb); //systemverilog assertion을 가진 모듈
+bit[7:0] data, addr;
+event write_event;
+cover property
+    (@(posedge sb.slk) sb.write_ena == 1)
+    ->write_event;
+endmodule
+
+
+program automatic test(simple_bus sb);
+//어써션을 통해 트리거되는 커버 그룹
+covergroup write_cg @($root.top.m1.write_event); 
+coverpoint $root.top.m1.data;
+coverpoint $root.top.ma.addr;
+endgroup
+
+write_cg wcg;
+
+initial begin
+    wcg = new();
+    sb.write_ena <= 1;
+    #10000ns $finish;
+end
+endprogram

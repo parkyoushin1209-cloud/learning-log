@@ -1,0 +1,89 @@
+크로스 커버리지
+커버 포인트 하나의 변수 또는 표현을 관찰해 기록
+발생한 버스 트랜잭션뿐만 아니라 도중에 발생한 에러, 소스, 목적지가 어딘지 알고 싶을 때
+-> 같은 시간 동안 두 개 이상의 커버 포인트에서 보였던 값을 측정하는 크로스 커버리지 필요
+n 개의 값을 가지는 변수와 m개의 값을 가지는 변수의 크로스 커버리지 측정 시 n*m 개의 크로스 bin 필요 
+
+
+covergroup CovDst34;
+dst : coverpoint tr.dst{
+    bins dst[] = {[0:$]}; // 모든 값이 각각 bin 생성
+}
+kind : coverpoint tr.kind{
+    bins zero = {0}; 
+    bins lo = {[1:3]};
+    bins hi[] = {[8:$]}; // hi_8, hi_9 ....... hi_F는 런타임 또는 리포트 생성시 생성되는 이름임
+    bins misc = default; // 미리 제외됨 => 커버리지 계산에 안 씀, 컴파일 시점에 사용은 가능함
+    option.weight = 0; // 가중치 0으로 설정 커버리지 계산에 사용하지 않음
+}
+cross dst, kind{ // 크로스 생성자는 두 개 이상의 커버 포인트의 조합된 값을 기록함
+    ignore_bins hi = binsof(dst) intersect{7}; // 빈의 개수를 줄일 수 있음
+    ignore_bins md = binsof(dst) intersect{0} &&
+                     binsof(kind) intersect{[9:11]};
+    ignore_bins lo = binsof(kind.lo); // 컴파일 시점에 사용 가능한 이름 있을 때만 가능
+    option.weight = 5; //hit는 똑같이 올라가나 커버리지 계산 시 가중치 이용
+}
+크로스문은 커버포인트나 간단한 변수들만 취함(표현-계층적 이름 또는 객체의 변수 등-을 사용하고 싶으면 커버포인트 내 표현을 라벨과 함께 명시 후 크로스문에서 사용)
+
+endgroup
+크로스 커버리지 존재할 경우 커비리지 = (sum(커버포인트 커버리지) + 크로스 커버리지의 값) / 크로스 커버리지 수 + 커버포인트 수
+커버리지 = sum(각 항목 커버리지 * 가중치) / sum(가중치)
+
+크로스 커버리지의 정의가 정교해지면서 어떤 bin이 사용되고 무시되는지 명시하는 데 상당한 시간이 걸릴 수 있음
+두 개의 랜덤 비트 a,b 에 대해 흥미로운 상태가 (a=0, b=0), (a=1, b=0), (b=1) 이라고 가정하면 다음 3가지 중 선택해서 사용 가능
+class Sample;
+rand bit a,b;
+endclass
+
+covergroup CrossBinNames; // 이미 bin 이름이 정의 돼있고 이들을 사용하고 싶을 경우
+a : coverpoint sam.a{
+    bins a0 = {0};
+    bins a1 = {1};
+}
+b : coverpoint sam.b{
+    bins b0 = {0};
+    bins b1 = {1};
+}
+ab : cross a, b{
+    bins a0b0 = binsof(a.a0) && binsof(b.b0);
+    bins a1b0 = binsof(a.a1) && binsof(b.b0);
+    binsof b1 = binsof(b.b1);
+}
+endgroup
+
+covergroup CrossBinsofIntersect; // 크로스 커버리지 생성을 원하나 미리 정의된 커버포인트 bin이 없을 때
+a : coverpoint sam.a{
+    option.weight = 0;
+}
+b : coverpoint sam.b{
+    option.weight = 0;
+}
+ab  : cross a,b{
+    bins a0b0 = binsof(a) intersect {0} &&
+                binsof(b) intersect {0};
+    binsof a1b0 = binsod(a) intersect {1} &&
+                  binsof(b) intersect {0};
+    binsof b1 = binsof(b) intersect{1};
+}
+endgroup
+
+covergroup CrossManual; //가장 간결한 형태를 원할 때
+ab : coverpoint {sam.a, sam.b}
+{
+    bins a0b0 = {2'b00};
+    bins a1b0 = {2'b10};
+    wildcard bins b1 = {2'b?1};
+}
+endgroup
+
+
+
+
+옵션 타입
+1. 커버그룹의 인스턴스에만 특정한 옵션 => 지역 변수와 비슷 , option 이용
+2. 커버그룹 타입 전체에 적용되는 옵션 => type_option 사용, 커버그룹에 묶여있음(like 클래스 안 static 변수)
+
+여러 클럭 도메인으로부터 데이터를 병합하는 법
+1. 각 클럭 도메인에서 값 샘플링 해 임시 변수(FIFO) 저장
+2. 동기화 시점에서 새 커버그룹의 cross coverage 측정
+3. 저장 개수(FIFO 깊이)는 조합 가능성/동시 발생 수에 따라 결정

@@ -1,0 +1,75 @@
+용어 설명
+신드롬(syndrome) = 에러 검출용 값으로 보통 HEC(horizontal error check)나 FCS(frame check sequence) 결과를 담고 있다.)
+이 테스트 벤치에서는 ATM 셀 헤더나 페이로드에 오류가 있는지 확인할 때 사용한다.(전송시: sender가 신드롬 계산 후 헤더에 넣음 / 수신시: receiver가 신드롬 재계산 후 비교)
+GFC(generic flow control): UNI에서만 쓰이는 흐름 제어용 필드)
+VPI(virtual path identifier) : 이 셀이 어느 가상 경로에 속하는지 나타내는 식별자
+VCI(virtual channel identifier) : 같은 VPI 안에서 개별 채널을 구분
+CLP(cell Loss Priority) : 셀 버려도 되는지 우선순위
+PT(payload type) : 사용자 데이터인지, OAM인지 등
+
+1. SV_RAND_CHECK 매크로 정의
+역할: 랜덤화 및 실패 시 오류 출력
+
+2. 시간 정밀도 및 특정 값 define
+역할: timescale 또는 timeunit/timeprecision 설정 및 상수 값 define
+
+3. top 모듈
+역할: //(파라미터 설정/ 인터페이스 배열 선언/ DUT, Test 인스턴시에이션/clk 및 rst 설정)
+
+4. 테스트벤치//인터페이스 받고 환경 객체 생성부터 wrap_up()까지 인터페이스 3개
+역할: 환경 클래스 생성부터 wrap_up까지 + 콜백 설정/cfg 제약 추가(할거면)
+
+5. 인터페이스 정의
+역할: 모드포트 및 클로킹 블록 설정
+
+6. 환경 클래스//(드라이버/모니터/제너레이터 다이나믹 배열, 가상 인터페이스 인터페이스 3개, 스코어보드, 커버리지, 설경객체, CPU driver) <가상 인터페이스 있음>
+//new 설정객체 인스턴시에이션, ifc 할당, seed//cfg_gen 설정객체 랜덤화//build 각종 구성 부품 초기화, 콜백 생성자 사용 및 큐에 삽입
+//run fork join_none 활용 병렬로 돌리는 것을 목표로 사용//wrap_up scb wrap_up
+역할: cfg 랜덤화, 콜백 생성자 사용 및 큐에 삽입(build-run) 사이에 함, 구성 부품 run, wrap_up
+
+7. 드라이버 -> 스코어보드 콜백 클래스//new -> scoreboard//post_tx scb.save_expected
+역할: 예상값 저정
+
+8. 모니터-> 스코어보드 콜백 클래스// new -> scoreboard // post_tx scb.actual(input Monitor mon, input NNI_cell c) scb.check_actual
+역할: 실제값과 비교
+
+9. 모니터 - 커버리지 콜백 연결 //new -> coverage // post_tx => VPI로 FWD확인 및 샘플
+
+10. 설정 객체 설정 cfg
+역할: 제약 => 셀의 개수, 유효한 채널 설정 및 채널의 총 total 수 설정,  채널 별 셀의 개수, 에러/경고 수 저장
+
+11.  CellCfgType packed 구조체 정의(멤버 : [`TxPorts-1:0] FWD, VPI)
+
+12. uniType, nniType packed 구조체 정의, ATMCellType 공용체 정의
+uni는 ifx_rx로 DUT로 nni는 DUT에서 나오는 셀 타입임/ ATMCellType으로 형변환 가능하도록
+
+13. UNI_cell 클래스 정의 copy, to_nni, new, post_randomize, generate_syndrome,  compare, pack, unpack, hec
+역할: nni로 전환 등
+
+14. unicell_generator new, run 
+블루프린트 랜덤화 및 복사본을 mailbox put + driver 기다림
+
+15. driver<vifc 있음 rx만 > new, run, send
+역할: new -> malbox, event, vifc, portid / run -> uni_cell 에 콜백 전부 적용 pre_tx-send-post_tx 순 마지막에 제너레이터 깨움 / send 패킷에 pack하고 clav 활성화 및 en신호 활성화 시 ifx_rx_data에 mem 1바이트씩 저장(논블로킹)
+
+16. 드라이버 베이스 콜백 클래스: 내용 빈 pre_tx, post_tx
+
+17. 모니터 베이스 콜백 클래스 : 내용 빈 post_tx
+
+18. 모니터 클래스 <vifc 있음 tx만> new, run, receive
+역할: new -> ifc, portid / run -> receive + post_tx / receive ->  mem[i]에 Tx.cbt.data 1바이트씩 받기(블로킹) c에 Pkt 언팩
+
+19. Expect_cells 클래스 정의 (NNI_cell q[$], int iexpect, iactual)
+
+20. scoreboard 클래스 정의 (config cfg, Expect_cells expect_cells[],  NNI_cell cellq[$], int iexpect, iactual)
+역할 new -> cfg 설정, expect_cells 다이나믹 배열 크기 설정 및 생성 / save_expect -> ncell = ucell.to_nni 및 ncell.VPI로 CellCfg 설정하고 CellCfg.FWD의 각 비트를 돌며 전송할 포트의 인덱스의 expect_cell q에 넣고, iexpect 둘다 ++
+/check_actual -> if expect_cells q 사이즈 0이면 에러++ 반환 || iactuacl 둘 다++  q를 돌며 대해 input NNI_cell c와 같으면 그 인덱스 지우고 반환 아니면 없으면 error 
+/ wrap_up -> 시뮬레이션 결과 리포트 출력, 각 expect_cells 를 돌며 q 사이즈가 1이상이면 error++
+/ display -> 지금까지 iexpect, iactual 출력, 각  expect_cells 돌며 iexpected, iactual 출력
+
+21. 커버리지 클래스 설정 (bit[1:0] src, bit[NumTx-1:0] fwd, covergroup CG_Forward[coverpoint src => bins src[] = {[0:3]} , 가중치0 bins fwd[] = {[1:15]} 가중치 0 나머지는 커버리지 계산에 이용 안함
+역할 new => covergroup 생성 / sample src, fwd를 받아 샘플 진행
+
+22. CPU_driver class(vCPU_T vifc 가짐) + 설정객체(나중에 이용 가능하도록) + lookup 배열, bit[NumTx-1:0]fwd
+역할: new -> 설정객체 및 ifc 설정 / initialize_host -> 신호 초기 상태로 세팅 / Host_write -> 주소랑 데이터를 받은 이후 신호 조작 / Host_Read -> 주소 반환할 데이터 인자로 받고 신호 조작
+/ run ->  initialize -> 기다리고 FWD에 랜덤 값 부여(FWDALL이 정의돼 있으면 1로 다시 맞춰줌) VPI를 i로 맞춘후(주소) -> write(i, CellFwd) lookup[i] = CellFwd i(0부터 255까지) -> 다시 0~255까지 read(i, CellFwd) 이후 lookuo과 비교 및 일치하지 않으면 종료

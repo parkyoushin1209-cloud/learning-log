@@ -1,0 +1,81 @@
+Generic covergroup
+-중복된 내용이 많은 커버그룹들 생성 시 유용함 인스턴시에이션 할 때 세부 사항 명시
+
+1. 커버그룹에 값으로 인자 넘겨주기
+covergroup CovDst39(int mid);
+
+coverpoint tr.dst{
+    bins lo = {[0:mid-1]};
+    bins hi = {[mid:$]};
+}
+
+endgroup
+CovDst39 cd;
+cd = new(5);
+
+2. 커버그룹에 참조로 인자 넘겨주기
+시뮬레이션동안 샘플
+bit [2:0] dst_a, dst_b;
+
+covergroup Dst40(ref bit[2:0]dst, input int mid); //mid에 input이 없었으면 ref가 돼 상수 전달 불가능
+coverpoint dst{
+    bins lo = {[0:mid-1]};
+    bins hi = {[mid:$]};
+}
+endgroup
+
+Dst40 a,b;
+
+a = new(dst_a, 4); 
+b = new(dst_b, 2);
+
+------------------------------------------------------------------------
+  
+A. coverage option
+option을 사용해 커버그룹 안에 추가적인 내용 명시 가능
+두 종류 인스턴스 옵션, 커버그룹 옵션 존재
+커버그룹 안에 배치해 모든 커버포인트에 적용되게 또는 커버포인트 안에 두어 커버포인트에만 적용되게 할 수 있다.
+
+1. per_instace 옵션
+하나의 커버그룹 타입의 객체를 여러 개 생성 시 기본적으로 모든 객체의 커버리지를 반영해 total 커버리지 계산됨
+per_instace 옵셥을 이용해 각각 계산되게 가능
+covergroup CovDst41;
+coverpoint tr.dst;
+option.pre_instance = 1; // 커버그룹 전체에만 적용됨(커버 포인트 단일은 안 됨)
+endgroup
+
+2.comment 옵션 
+covergroup com;
+type_option.comment = "comment"; //인스턴스를 1개만 생성할거면 type_option 사용
+endgroup
+
+covergroup com1(int lo, hi, string comment);
+option.comment = comment;
+option.per_instance;
+coverpoint tr.dst{
+    bins range = {[lo:hi]};
+}
+endgroup
+
+3. coverage threshold
+디자인의 현재 상태에는 접근할 수 없으나 그 트랜잭션에 필요한 사이클 범위를 알고있을 때 (ex. 전송이 8사이클 안에 이루어진다고 하면)
+option.at_least = 8 또는 그 이상으로 => 많이 실행되도 모든 bin들이 hit될거라는 보장은 없음
+=> 테스트벤치가 DUT를 직접 관찰하지 못하는 경우처럼 커버리지를 직접적으로 측정하는 방법이 없을 때만 사용하기
+
+4.printing the empty bins
+검증은 검증계획 내 모든 것들을 검증해야하기에 hit이 되지 않은 bins를 확인하는게 중요할 수 있음
+cross_num_print_missing 사용 읽을 의향이 있을 정도로만
+covergroup CovDst44;
+kind : coverpoint tr.kind;
+dst : coverpoint tr.dst;
+cross kind, dst;
+option.cross_num_print_missing = 1000;
+endgroup
+
+5. coverage goal
+커버그룹/커버포인트의 목적은 일반적으로 완전히 커버됐다고 고려될만한 정도의 수준임 
+보통 100%이나 더 낮게 설정시 완전한 커버리지보다 더 낮게 요구 가능하나 바람직하진 않을 것임
+covergroup CovDst45;
+coverpoint tr.dst;
+option.goal = 90; // 커버리지 리포트에만 영향
+endgroup

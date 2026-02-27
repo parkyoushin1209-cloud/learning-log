@@ -1,0 +1,36 @@
+sv
+1. assert property, cover property, cover group 의 차이점
+
+------------------------------------
+| 구분       | assert property      | cover property          | cover group                                 |
+| 목적       | 검증(조건 충족 여부) | coverage(발생 여부 기록) | functional coverage(데이터/트랜잭션 샘플링)  |
+| 보는 대상  | 시퀀스(sequence)     | 시퀀스(sequence)         | 값/트랜잭션                                 |
+| 위반 시    | 에러 발생            | 없음                     | 없음                                        |
+| 방식       | 관찰 + 체크          | 관찰                     | 샘플링                                      |
+|이벤트 기반 | O                    | O                        | 주로 clock edge 기반                        |
+assert property = 검증용, 실패 시 에러
+cover property = 시퀀스 발생 여부 관찰, 실패 없음
+cover group = 값/트랜잭션 샘플링, functional coverage
+
+2. Formal tool이 무엇인가?
+Formal tool = 시뮬레이션 없이, 수학적/논리적으로 설계가 맞는지 증명하는 검증 도구
+테스트를 돌려보는게 아닌
+모든 가능한 경우를 증명하거나 반례를 찾는 툴
+
+시뮬레이션과 차이점
+1. 시뮬레이션 기반 검증 => 테스트 벤치 + stimulus 일부 경우만 실행
+
+2.Formal 검증 => assertion / property 기반, 가능한 모든 입력 상태 조합을 탐색, 이 조건은 항상 참인지 확인
+
+formal tool의 역할
+
+assert property가
+모든 경우에 대해 항상 성립하는지 증명 => 성립하지 않으면 반례 제공
+
+사용하기 좋은 경우
+FSM, arbitration, protocol 같은 제어 로직
+corner case가 많은 설계
+simulation으로는 절대 다 못 도는 경우
+“절대 깨지면 안 되는 규칙” 검증
+안 좋은 경우
+대규모 데이터 패스, 메모리 깊은 구조는 어려움

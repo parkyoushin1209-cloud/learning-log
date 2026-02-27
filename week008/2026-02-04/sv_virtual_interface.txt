@@ -1,0 +1,211 @@
+interface X_if(input logic clk); // 인터페이스 정의
+logic [7:0] din, dout;
+logic reset_l, load;
+
+clocking cb @(posedge clk); // reset_l은 비동기적 신호이므로 따로
+output din, load; // 테스트벤치 기준으로 작성
+input dout;  
+endclocking
+
+always @cb //monitor랑 다르게 always + strobe 조합을 사용해 해당 타임슬롯의 모든 할당이 끝나고 마지막에 출력
+$strobe("@%0t : %m: out = %0d, in = %0d, ld = %0d, r = %0d",
+        $time, dout, din, load, reset_l);
+
+modport DUT(input clk, input din, load, reset_l,
+            output dout);
+
+modport TB(input load, clocking cb);
+endinterface : X_if
+
+-----------------------------------------------------------
+module counter(X_if.DUT xi); //카운터
+logic [7:0] count;
+assign xi.dout = count;
+
+always @(posedge xi.clk or negedge xi.reset_l) begin
+    if(!xi.reset_l)  count <= '0;
+    else if(xi.load) count <= xi.din;
+    else             count <= count + 1;
+end
+endmodule
+-------------------------------------------------------------
+
+module top;
+parameter NUM_XI = 2; //인터페이스 개수
+
+bit clk; // 클럭 발생기
+initial begin
+    clk <= 0;
+    forever #20 clk = ~clk;
+end
+
+X_if xi[NUM_XI](clk); //인터페이스 배열 생성
+  test #(.NUM_XI(NUM_XI)) tb(); // XMR(cross module reference)로 넘겨줄 것이므로 tb() 괄호 비워둠 
+
+generate // 인터페이스만 바꿔가며 생성하면 되므로 generate 이용
+    for(genvar i; i < NUM_XI ; i++) begin // int 아닌 genbar사용
+        counter c(xi[i]);
+    end
+endgenerate
+endmodule
+--------------------------------------------------------------
+  program automatic test #(NUM_XI = 2); //테스트 벤치
+virtual X_if.TB vxi[NUM_XI]; //가상 인터페이스 배열 생성 1개 이상이라고 가정함 0개면 fixed_size 말고 다이나믹 사용
+Driver driver[];
+
+initial begin
+    vxi = TOP.xi; // vxi 할당은 여기서
+    driver = new[NUM_XI];
+    
+    foreach(driver[i])
+    driver[i] = new(vxi[i],  i);
+
+    foreach(driver[i]) begin
+        automatic j = i;  //join_none이므로 automatic 변수 사용 아닐 경우 driver[last_idx].reset()/load_op()만 반복함
+        fork
+            begin
+            driver[j].reset();
+            driver[j].load_op();
+            end
+        join_none
+    end
+    repeat (10) @(vxi[0].cb);
+end
+endprogram
+ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
+class Driver;
+virtual X_if.TB xi;
+//Driver가 layered testbench의 active component라서, DUT를 “제어하는 쪽 신호만” 접근하도록 의도적으로 제한하기 위해 TB 모드포트 사용.
+// 일반적으로 드라이버, 스코어보드 등의 레이어드 테스트벤치 구성요소에는 모드 포트 사용 안 함
+int id;
+
+function new(input virtual X_if.TB xi, input int i);
+this.xi = xi;
+this.i = i;
+endfunction
+
+task reset();
+$display("@%0t: Driver[%0d]: Start reset", $time, id);
+xi.reset_l <= 1;
+xi.cb.load <= 0;
+xi.cb.din <= '0;
+@(xi.cb) xi.reset_l <= 0;
+@(xi.cb) xi.reset_l <= 1;
+$display("@%0t: Driver[%0d]: End reset", $time, id);
+endtask
+
+task load_op();
+$display("@%0t: Driver[%0d]: Start load", $time, id);
+##1 xi.cb.load <= 1;
+xi.cb.din <= id + 10;
+##1 xi.cb.load <= 0;
+repeat(5)@(xi.cb);
+$display("@%0t: Driver[%0d]: End load", $time, id);
+endtask
+
+endclass
+
+
+typedef virtual X_if.TB vx_if; // typedef로 정의해 타이핑 줄임 + 정확한 모드포트 이용 보장
+
+
+parameter NUM_XI = 2; //global parameter setting
+module top;
+X_if xi[NUM_XI](clk);
+//.....
+test tb(xi); //포트로 전달
+endmodule
+ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
+program automatic test(X_if xi[NUM_XI]);//port로 가상 ifc array 전달
+vx_if vxi[NUM_XI];
+Driver driver[];
+
+initial begin
+    vxi = xi; //top.xi랑 다름 여기서도 initial 블록 안에서 설정
+    driver = new[NUM_XI];
+
+    foreach(vxi[i])
+    driver = new(vxi[i],i);
+
+    foreach(vxi[i])
+    fork
+        begin
+            driver[i].reset();
+            driver[i].load_op();
+        end
+    join
+    //.......
+end
+endprogram
+
+----------------------------------------
+//비트폭도 같이 설정
+
+interface x_if #(BIT_WIDTH = 8) (input logic clk);
+logic [BIT_WIDTH-1:0] din, dout;
+logic load, reset_l;
+...........
+endinterface
+ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
+module counter #(BIT_WIDTH = 8) (x_if.DUT xi);
+logic [BIT_WIDTH - 1: 0] count;
+assign xi.dout = count;
+
+............................
+endmodule
+
+module top; //top에는 #안 씀, 여기서 파라미터 설정함, 모드포트도 안 씀(애초에 DUT, TB만 만들어 놨음)
+parameter BIT_WIDTH = 8, NUM_XI = 2;
+
+bit clk;
+initial begin
+    clk <= 0;
+    forever #20 clk = ~clk;
+end
+
+x_if #(.BIT_WIDTH(BIT_WIDTH)) xi[NUM_XI];
+test #(.BIT_WIDTH(BIT_WIDTH), .NUM_XI(NUM_XI)) tb();
+
+generate
+    for(genbar i = 0; i < NUM_XI ; i++) begin
+        counter #(.BIT_WIDTH(BIT_WIDTH)) c(xi[i]);
+    end
+endgenerate
+
+endmodule
+
+program automatic test #(BIT_WIDTH = 8, NUM_XI = 2); // 모드포트 여기에 안 썼음!!!!, 포트로 전달 아님 구별하기
+virtual x_if #(.BIT_WIDTH(BIT_WIDTH)) .TB = vxi[NUM_XI];
+Driver #(.BIT_WIDTH(BIT_WIDTH))driver[];
+................................
+endprogram
+
+class Driver #(BIT_WIDTH = 8, NUM_XI = 2);
+virtual x_if #(.BIT_WIDTH(BIT_WIDTH)) xi; 
+int id;
+........
+endclass
+
+내용 정리
+1. typedef로 타이핑 줄이고 모드포트를 잘 못 사용할 가능성을 줄일 수 있다.
+2. 인터페이스 배열은 cross module refenence 방식과 포트를 이용한 방식으로 전달 가능하다.
+3. 베릴로그에서 모듈에 파라미터화를 제공하듯 인터페이스에도 파라미터화를 적용 가능하다(여기서는 비트 폭 설정)
+4. 인터페이스 내부에 절차적 코드(initial, always, routine, assertion 등)를 사용할 수 있다.
+  
+루틴의 내부 동작은 외부로 부터 숨겨져 있기에 구현을 미룰 수 있으며 모드 포트로 접근, 컨트롤 할 수 있다. 
+또한 디자인, 테스트벤치에서 모두 사용 가능하다 이 방식의 장점은 버그의 공통된 출처 제거, 같은 프로토콜 사용 보장이다
+다만 단점은 디자인, 테스트벤치가 코드를 공유해 설계, 검증 팀의 톡립성을 잃어버릴 수 있다는 점이다.
+인터페이스 내부 어써션은 주로 protocol violation, unknown values를 체크하는 데 쓰인다.
+기능적 커버리지는 커버리지 데이터 수집 트리거를 위해 이런 종류의 어써션을 사용한다.
+
+5. 인터페이스 코드의 제한
+  인터페이스 내부 태스크는 기능이 언격히 정의되는 RTL에서는 괞찮으나 verification IP 에서의 사용은 좋지 않다.
+  인터페이스 와 이 안에 포함된 코드는 설정에 따라 확장되거나 동적으로 인스턴스화 될 수 없다.
+  인터페이스는 private 데이터는 가질 수 없다.
+  검증을 위한 어떤 코드라도 최대의 유연성, 설정 가능성을 필요로하므로 프로그램 블록 안에서 실행되는 클래스 안에 들어가야 한다.
+
+6.결론
+  sv에서 ifc는 생성하는 그룹 전체에 (연결성/타이밍/블록 사이 통신을 위한 기능) 등 강력한 기술을 제공한다.
+  가상 ifc를 사용하면 신호 계층 코드는 런 타임때 가변 개수의 물리적 ifc에 연결될 수 있따.
+  인테페이스는 신호를 구동하는 루틴, 프로토콜을 체크하는 어써션을 가질 수 있으나 **테스트는 프로그램 블록 안에 둬라**
+  다방면으로 인터페이스는 포인터, 캡슐화, 추상화를 가진 클래스와 닮을 수 있으며 베릴로그의 포트, 넷보다 더 높은 수준에서 시스템을 모델링하는 ifc 생성을 허용한다.
