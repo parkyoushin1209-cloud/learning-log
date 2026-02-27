@@ -1,0 +1,61 @@
+first_match 연산자
+
+시퀀스가 선행조건으로 쓰일 때 중요함 => 시퀀스가 성공하기 위해서는 선행시퀀스의 모든 스레드가 테스트 돼야하나 불가능하며 실패만 가능할 수도 있음
+시퀀스가 no match -> first_match(seq)도 no match
+이외에는 첫매치를 first_match의 match로 같은 클럭 틱에 여러 match가 있다면 이 매치 전부를 match로 인정해줌
+
+시퀀스가 그 자체로 프로퍼티라면 암묵적 first match를 가진 듯 행동함
+
+선행조건 시퀀스에 적절하게 $rose, $changed, $fell을 사용하고 고유한 매치를 원한다면 first_match를 사용
+A->B->C인 경우 A, B에 모두 first_match 사용
+
+end point of sequence, .triggered
+seq_inst,triggered로 사용
+참 또는 거짓이며 종료지점 도달 여부를 평가하고 시작 지점에는 의존하지 않는다.
+=> 시퀀스의 종료지점은 부울 표현(마지막 사이클에서 시퀀스 스레드의 평가를 나타냄)
+end point는 다른 어써션 테스트를 위한 시드로도 사용 가능(A.triggered |=> B)
+
+어써션 시퀀스는 다른 문맥의 추론 가능
+(default clocking 또는 시퀀스가 절차적 코드 안에서 사용된 경우 절차적 코드의 클럭킹 이벤트로부터)
+=> 시퀀스 선언은 그 선언 내부에 클럭킹 이벤트 명시 안 해도됨
+.triggered, .matched는 시퀀스의 inst로 사용 가능함
+
+가이드라인: .triggered , .matched 메서드와 함께 사용할 시퀀스 선언은 선언 내부에 명시된 클럭킹 이벤트를 가져야 함
+
+규칙 시퀀스의 end point는 .triggered 메서드에서 획득
+어써션 지시어가 그 어써션에 적용되는 .triggered메서드가 있는 시퀀스를 가지면 시퀀스의 end point는 다음과 같이 계산됨
+1. 매 클럭킹 이벤트에서 시퀀스의 시작 평가가 수행됨
+a. 평가의 시작에서 no match -> end point에 대한 고려사항에서 그 시퀀스 폐기(매치 가능성 없음)
+b. 평가의 시작에서 첫 항목이 match + 그 시퀀스가 멀티 스레드 -> 종료 클럭 틱까지 시퀀스를 독립적으로 평가(여러 end point가 될 수 있음)
+c. 평가 도중 no match -> 고려 대상에서 제외
+2.시퀀스 스레드 ending에 매치가 있다 -> 그 스레드는 end point, true 반환
+3. 매치가 없다 -> end point 아님, false 반환
+4. 클럭킹 이벤트에 어떤 스레드에도 end point가 없다 -> false 반환
+5. 클럭킹 이벤트에 end point가 있다 -> true 반환
+
+가이드라인: end point가 선행조건 또는 wait문에서 쓰일 때 예상치 못한 결과 방지를 위해 멀티 스레드 시퀀스에 first_match 적용
+시퀀스에 적용되는 triggered메서드를 가지는 시퀀스에 first_match를 사용하지 말기
+
+end point of sequences, .matched, .triggered
+triggered, matched 동작 메커니즘
+1. observed 영역에서 값 반환// 여기서 프로퍼티의 평가 발생
+2. triggered는 해당 timestep의 끝에서 사라짐
+3. matched는 observed 영역에서 세트되고 마지막 사이클에서 스레드 평가 매치 후 첫 dst clk tick이 도착되는 observed영역에서 clear
+matched의 값은 end point에서 false이고 매치 후 첫 dst clk tick의 도착에서 true
+4. triggered는 @()내부나 if 조건 부분에 사용금지
+
+핵심** 멀티클럭 시퀀스에서 
+triggered는 그 시퀀스의 ending clock과 동일한 클럭 문맥에서만 사용 가능
+matched는 다른 문맥 clk에서 set 현재 문맥 clk에서 clear => 멀티 클럭에서 사용 가능
+
+sequence q1_sysclk; @(posedge sysclk)
+a_sysclk ##1 b_sysclk;
+endsequence
+
+sequence qok; @(posedge sysclk)
+a_sysclk ##1 q1_sysclk.triggered ##1 b_sysclk ##1 @(posedge clk) d_clk;
+endsequence
+
+sequence qBUG; @(posedge clk)
+a_clk ##1 q1_sysclk.triggered ##1 d_clk;
+endsequence // q1_sysclk의 ending clock은 sysclk로 clk가 아니므로 버그임
