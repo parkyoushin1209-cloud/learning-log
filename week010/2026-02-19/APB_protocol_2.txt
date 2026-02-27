@@ -1,0 +1,62 @@
+전송
+1. 쓰기의 경우
+1-1. 지연 없음
+SETUP Phase
+PSEL = 1 나머지 주소[PADDR], 제어 신호[PWRITE=HIGH]는 이때부터 stable 유지해야함(전송 끝날때까지) 
+
+ACCESS Phase
+PENABLE = 1, 슬레이브가 준비되면 PREADY = 1 => 이 때부터 쓰기 데이터 유효하며, 다음 상승에지에서 쓰기가 종료됨
+
+마무리 단계
+같은 장치로의 또 다른 전송이 없다면 PENABLE, PSEL 비활성화 됨
+
+1-2 지연 있음
+SETUP 은 동일 
+
+ACCESS Phase
+PENABLE = 1, 이 때 PREADY는 0(전송 확장의 조건임) 0~2사이클 지연 후 PREADY는 1로 나머지는 동일
+
+마무리 단계
+1-1과 동일
+
+PSTRB 
+쓰기 데이터 버스에서 희소 데이터 전송을 가능하게 함
+각 PSTRB는 쓰기 데이터 버스의 1바이트와 상응
+HIGH가 됐을 때 상응하는 쓰기 데이터 버스의 byte lane이 유효 정보를 포함함을 나타냄
+읽기 전송을 위해 Requester는 PSTRB의 모든 비트를 LOW로 구동해야 함
+
+presence, compatibility
+PSTRB는 선택적 신호임
+APB 주변 장치는 제한된 접근 유형만을 지원 가능하므로 프로그래머를 위해 문서화 돼야 함
+(이 문서에 희소 쓰기가 지원되지 않는다고 명시돼 있으면 PSTRB의 모든 조합이 호환되지 않을 수 있음)
+
+Requester   completer
+!presence    !presence    호환가능, 희소 쓰기 지원x
+ o                  x           호환 가능, 희소 쓰기 지원 x
+ x                  o           호환 가능, 모든 쓰기 데이터 바이트 레인은 쓰기에 있어 유효, PWRITE는 Requster로부터 출력
+ o                  o           호환 가능
+
+2.쓰기의 경우
+PWRITE, PWDATA->PRDATA로 바뀌는 것 외에는 1과 동일
+
+
+
+검증 포인트(어써션)
+PSEL && !PENABLE : 다음 사이클에 PENABLE 올라와야 함
+ACCESS 동안 PADDR, PWRITE는 stable 유지
+PREADY가 올라온 사이클에만 전송 종료
+PREADY && PENABLE 일 때 데이터 유효(이 때 트랜잭션 받음)
+PREADY && PENABLE && PSEL => 종료 조건 충족
+
+Error response
+PSLVERR은 전송에서 에러 조건 표시에 사용 가능(읽기/쓰기 트랜잭션 모두에서 발생 가능)
+PSLVERR는 트랜잭션 전송의 마지막 사이클 동안만 유효(PREADY && PENABLE && PSEL) - 이 때만 HIGH로 두도록 권장됨
+오류를 수신한 트랜잭션은 주변 장치 상태를 변경하거나 변경하지 않았을 수 있으며 주변 장치에 따라 달라짐
+
+쓰기 트랜잭션의 에러 수신은 주변 장치 내부 레지스터가 변경됨을 의미하지는 않음
+
+에러를 수신한 읽기 트랜잭션은 유효하지 않은 데이터를 반환할 수 있음
+읽기 오류 발생 시 주변 장치가 데이터 버스를 모두 0으로 바꿀 의무가 없으며
+requester도 그 데이터를 여전히 이용 가능 => completer는 PRDATA에서 값이 읽히는 것을 막아줄 것이라 기대하면 안됨
+
+completer는 PSLVERR 를 지원하도록 요구되지는 않음, PSLVERR를 포함하지 않는 completer의 경우 해당 requester쪽 입력 신호는 Low에 고정돼야 함

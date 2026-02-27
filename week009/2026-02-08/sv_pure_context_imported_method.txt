@@ -1,0 +1,12 @@
+pure: 외부와 상호작용 하지 않음
+- 출력이 입력에 의해 엄격히 계산됨(입력이 같다면 출력이 같음)  -전역 변수, static 변수를 사용하지 않음
+- 파일 연산자를 사용하지 않음                                 -외부함수와 상호작용 하지 않음(operating system, shared memory, processes, sockets 등)
+import "DPI-C" pure function int factorial(input int i); 와 같이 pure 키워드 사용
+
+context: c에서 가져온 루틴은 PLI루틴이나 sv에서 내보내진 함수를 사용하기 위해 sv의 문맥을 알아야 함
+-context 속성 사용 
+import "DPI-C" context task call_sv(bit[31:0] data); 
+-시뮬레이터가 호출 문맥을 기록할 필요가 있어 오버헤드가 발생할 수 있다.
+
+generic: SV LRM상에서 따로 정의하고 있는 단어는 없음
+-외부와 상호 작용이 필요할 경우 pure를 사용하지 않고 어떤 PLI루틴도 가지고 있지 않을 경우 context를 사용하지 않을 수도 있으며 이런 함수를 generic 함수라 함

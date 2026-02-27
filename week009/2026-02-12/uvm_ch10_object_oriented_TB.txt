@@ -1,0 +1,204 @@
+/* 1모듈 4클래스
+top - 테스트벤치 클래스를 인스턴스화 하는 탑 레벨 모듈
+testbench - 탑 레벨 클래스
+tester - 스티뮬러스 구동
+scoreboard - ALU의 동작 체크
+coverage - 기능적 커버리지 정보 획득
+*/ // 변화를 가하더라도 이 기능은 유지함
+
+
+// top module -> 클래스 정의 가져오기, 테스트벤치 클래스 변수 정의/DUT,BFM 인스턴스화/테스트벤치 클래스 인스턴스화 및 실행
+// 1. 클래스 정의 가져오기 : 객체 지향 TB 작성 시 모든 클래스 정의, 패키지(클래스 및 여러 모듈에서 변수 사용 가능하게 해줌) 내 공유된 자원 저장
+// 2. DUT, BFM 인스턴스화 및 TB클래스 변수 선언
+// 3. testbench 인스턴스화 및 실행
+package tinyalu_pkg;
+typedef enum bit[2:0] {no_op = 3'b000,
+                       add_op = 3'b01,
+                       and_op = 3'b010,
+                       xor_op = 3'b011,
+                       mul_op = 3'b100,
+                       rst_op = 3'b111} operation_t;
+
+endpackage
+
+interface tinyalu_bfm; // => tinyalu TB의 모든 신호 캡슐화, 클럭, reset_alu() task, send_up task{alu로 op 보냄} 제공
+import tinyalu_pkg::*;
+
+operation_t op_set;
+byte unsigned A; // 패키지로 들어가면 ifc.A 형식으로 접근 불가능
+byte unsigned B;
+bit clk;
+bit reset_n;
+wire [2:0]wire;
+bit state;
+wire done;
+wire [15:0] reslt;
+
+task send_op(input byte iA, input byte iB, input operation_t iop, 
+             output shortint ale_reset);
+// 연산자 및 데이터 취하고 start 신호를 올린 후 요청된 연산자에 근거해 다시 내림 
+// => 이런 캡슐화는 두 가지 이득이 있음
+//1. 프로토콜 수준 동작을 코드 여기저기 넣어둘 필요 없음(신호들을 다루는 코드보다 이 태스크 호출이 더 간편)
+//2. 하나의 장소에 모든 프로토콜 동작 수정 가능(여기에서의 수정 사항은 설계 전체에 퍼짐)
+//operation_t는 패키지에 정의된 열거형 타입임 
+op_set = iop;
+
+if(iop == rst_op) begin
+    @(posedge clk);
+
+end else begin
+    @(negedge clk);
+    A=iA;
+    B=iB;
+    start = 1'b1;
+    if(iop == no_op) begin
+        @(posedge clk);
+        #1;
+        start = 1'b0;
+    end else begin
+        do
+        @(negedge clk);
+        while(done == 0);
+        start = 1'b0;
+    end
+end
+endtask
+
+task reset_alu();
+reset_n = 1'b0;
+@(negedge clk);
+@(negedge clk);
+reset_n = 1'b1;
+start = 1'b0;
+endtask : reset_alu
+
+endinterface
+
+
+module top;
+import tinyalu_pkg::*; // 4개의 클래스 정의
+`include "tinyalu_macros.svh" // 유용한 메크로 정의
+
+tinyalu DUT(.A(bfm.A), .B(bfm.B), .clk(bfm.clk), 
+            .op(bfm.op), .reset_n(bfm.reset_n),  
+            .start(bfm.start), .done(bfm.done), .result(fm.result));
+tinyalu_bfm bfm();
+testbench testbench_h;// 모듈 기반에서 사용하던 스티뮬러스, 셀프 체크, 커버리지 모듈을 가짐
+
+initial begin
+    testbench_h = new(bfm);
+    testbench_h.execute();
+end
+
+endmodule : top
+
+=========================
+//테스트 벤치 클래스는 각 부분을 가리키는 핸들 선언, 객체 생성, 실행 담당
+class testbench;
+
+virtual tinyalu_bfm bfm; // 이후 실체 인터페이스 핸들을 전달 받을 것임을 알림
+
+tester tester_h;
+coverage coverage_h;
+scoreboard scoarboard_h;
+
+function new(virtual tinyalu_bfm b);
+bfm = b;
+endfunction : new
+
+task execute();
+tester_h = new(bfm);
+coverage_h = new(bfm);
+scoreboard_h = new(bfm);
+
+fork
+    tester_h.execute();
+    coverage_h.execute();
+    scoreboard_h.execute();
+join_none
+endtask 
+
+endclass
+
+=================
+//the tester class - tinyALU를 랜덤 연산자와 함께 시뮬레이트
+
+class tester;
+
+virtual tinyalu_bfm bfm;
+
+function new(virtual tinyalu_bfm bfm);
+this.bfm = bfm;
+endfunction
+
+task execute();
+byte unsigned iA;
+byte unsigned iB;
+shortint unsigned result;
+operation_t op_set;
+bfm.reset_alu();
+op_set = rst_op();
+iA = get_data();
+iB = get_data();
+bfm.send_op(iA, iB, op_set, result);
+$stop;
+end
+================
+class scoreboard;
+virtual tinyalu_bfm bfm;
+
+function new(virtual tinyalu_bfm bfm);
+this.bfm = bfm;
+endfunction
+
+task execute();
+shortint predicted_result;
+forever begin : self_checker
+@(posedge bfm.done)
+case(bfm.op_set)
+add_op : predicted_result = bfm.A + bfm.B;
+and_op : predicted_result = bfm.A & bfm.B;
+xor_op : predicted_result = bfm.A ^ bfm.B;
+mul_op : predicted_result = bfm.A * bfm.B;
+endcase
+
+if((bfm.op_set != no_op) && (bf,.op_set != rst_op))
+if(predicted_result != bfm.result)
+$error("FAILED: A: %0h  B: %0h  op: %s  result: %0h",
+bfm.A, bfm.B, bfm.op_set.name(), bfm.result);
+end
+endtask
+
+endclass
+
+class Covgroup;
+virtual tinyalu_bfm bfm;
+
+covergroup op_cov; 
+coverpoint op_set {
+    bins single_cycle[] = {[add_op : xor_op], rst_op, no_op};
+    bins multi_cycle = {mul_op};
+}
+
+endgroup
+
+covergroup zeros_or_ones_on_ops; 
+
+all_ops : coverpoint op_set{ // rst, no를 제외한 모든 연산자가 사용됐는가?
+    ignore_bins null_ops = {rst_op, no_op};
+}
+
+a_leg : coverpoint A{ // 모든 가능한 값들이 테스트 됐는가?
+    bins zeros = {'h00};
+    bins others = {['h01 : 'hFE]};
+    bins ones = {'hFF};
+}
+
+endgroup
+
+
+function new(virtual tinyalu_bfm bfm);
+this.bfm = bfm;
+op_cov = new();
+zeros_or_ones_on_ops = new();
+endfunction

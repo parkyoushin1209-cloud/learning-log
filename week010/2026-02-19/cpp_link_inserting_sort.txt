@@ -1,0 +1,20 @@
+
+Link* insert_sorted(Link* head, Link* new_node) {
+	if (!head) return new_node;
+
+	Link* p = head;
+
+	while (p && p->value.name < new_node->value.name)
+		p = p->succ;
+
+	if (!p) {   // 끝까지 갔으면 맨 뒤
+		head->advance(1000)->add(new_node);
+		return head;
+	}
+
+	if (p == head)  // 맨 앞
+		return head->insert(new_node);
+
+	p->insert(new_node);
+	return head;
+  }

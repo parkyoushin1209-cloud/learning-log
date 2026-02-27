@@ -1,0 +1,86 @@
+1. class Hierarchies and Deep Operations
+계층을 내려갈수록 데이터 멤버가 하나씩 추가되는 경우 super.메서드를 호출해서 더 아래쪽에서도 최상위 계층의 메서드를 사용할 수 있게 할 수 있음(deep approach)
+얕은 복사의 경우 두 핸들이 각각 같은 객체를 가리킬 경우 하나의 핸들을 이용해 객체를 수정하면 다른 핸들도 영향을 받음
+깊은 복사가 필요 => deep approach를 이용하는 경우 최상위 클래스 타입을 인자로 넣고 super.메서드 호출
+
+2. uvm_transacion
+데이터를 일반 구조체로 만들 경우 수정하려면 사용한 모든 곳에서 같이 수정해줘야 함
+데이터를 클래스로 만들 경우 데이터의 필드 구성과 데이터 타입 종류를 몰라도 메서드를 통해 접근 가능하며 캡슐화되므로 수정에 있어서도 번거로움이 줄어듦
+트랜잭션은 데이터 저장 클래스로 볼 수 있으며 기본적으로 다음을 포함함
+
+1. copy
+2. convert2string(데이터 멤버를 문자열로 변환해 반환해줌)
+3. compare(트랜잭션 결과 비교시 유용 ex. 스코어보드에서 결과값, 예상값 비교)
+4. 시스템베릴로그의 랜덤화를 통해 데이터 필드 랜덤화(rand, constraint도 사용 가능)
+5. 트랜잭션 내 모든 데이터의 캡슐화를 통해 테스트벤치를 더욱 간단히 만들 수 있음 (rand_op, rand_value 등을 따로 정의하지 않아도 randomize 사용하면 됨)
+
+
+uvm_class command_transaction extends uvm_transaction; // uvm_transaction으로 부터 확장
+`uvm_object_utils(command_transaction) //uvm_transaction은 uvm_object로 부터 왔음 uvm_object_utils() 이용
+
+rand byte unsigned A; // 랜덤화 가능하게 rand로 설정
+rand byte unsigned B;
+rand operation_t op;
+
+constraint data{
+    A dist {8'h00 := 1, [8'h01 : 8'hFE] :/ 1, 8'hFF := 1};
+    B dist {8'h00 := 1, [8'h01 : 8'hFE] :/ 1, 8'hFF := 1};
+}
+
+function new(string name=""); // 생성자는 인자로 string name만 받음
+super.new(name);
+endfunction
+
+function bit do_compare(uvm_object rhs, uvm_comaparer comparer); // 인자는 이대로 들어가야 함
+command_transaction cmd;
+bit same;
+
+if(rhs == null) `uvm_fatal("RANDOM TRANSACTION", "Tried to do comparison to a null pointer");
+
+if(!$cast(cmd, rhs))
+    same = 0;
+else
+    same = super.do_compare(rhs, comparer) &&
+    (cmd.A == A) &&
+    (cmd.B == B) &&
+    (cmd.op == op);
+
+return same;
+endfunction
+
+function string convert2string();
+string s;
+s = $sformatf("A:%2h  B:%2h  op:%s", A, B, op.name()); //  문자열을 생성에 넘겨줌
+return s;
+endfunction
+
+function void do_copy(uvm_object rhs); // 인자는 uvm_object rhs로 고정
+command_transaction cmd;
+
+if(rhs == null) `uvm_fatal("RANDOM TRANSACTION", "Tried to copy from a null pointer");
+
+if(!$cast(cmd, rhs)) `uvm_fatal("RANDOM TRANSACTION", "Tried to copy a wrong type");
+
+super.do_copy(rhs);
+
+A = cmd.A;
+B = cmd.B;
+op = cmd.op;
+
+endfunction
+
+function command_transaction clone_me(); 
+uvm_object tmp;
+command_transaction clone;
+
+tmp = this.clone(); // uvm_object가 기본으로 제공함 
+$cast(clone, tmp); // clone을 통해 uvm_object 타입을 반환하므로 cast가 필요함
+
+return clone;
+endfunction
+
+endclass
+
+여러 핸들을 이용해 단일 객체를 공유하려는 개념은 mandatory obligatory object copy on write(MOOCOW)라는 디자인 규칙을 구현했을때만 가능
+깊은 복사를 이용해 다른 객체를 생성해서 주지 않을 경우 다른 핸들들도 전부 영향을 받게되므로 필수
+endclass

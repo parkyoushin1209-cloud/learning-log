@@ -1,0 +1,47 @@
+APB 프로토콜은 최소 파워 소비에 최적화되고, 인터페이스 복잡도가 줄어든 인터페이스
+APB 인터페이스는 파이프라인화 되지 않고, 간단하며 동기환된 프로토콜
+모든 전송은 최소 두 사이클이 걸림
+
+APB 인터페이스는 주변장치의 프로그래머블 컨트롤 레지스터에 접근하기 위해 설계됨
+APB 주위 장치들은 APB bridge를 통해 main memory system에 연결됨
+ex. AXI-APB 브리지는 다수의 APB 주변 장치들을 AXI 메모리 시스템에 연결하기 위해 사용될 수 있음
+
+APB 전송은 APB 브리지에서 시작됨
+APB 브리지는 requester로 불릴 수 있으며 주의 인터페이스는 리퀘스터에 반응함
+APB 주변장치들은 completer로 불릴 수 있음
+
+
+
+APB 인터페이스에서 몇몇 신호들은 고정된 비트폭 몇몇 신호들은 다양한 폭을 가질 수 있으며
+다양한 폭을 가진 경우 프로퍼티로 묘사되며 프로퍼티가 0이면 그 신호가 인터페이스에 없음을 의미함
+
+PCLK 1bit 클럭
+PRESETn      1비트 액티브 로우 리셋 신호
+PADDR       최대 32비트폭, APB 주소 버스
+PPROT       1비트 트랜잭션의 보호 수준과 트랜잭션이 데이터 접근인지 명령어 접근인지 나타냄, 보호 타입
+| Normal     | 일반 권한 | 사용자 모드                 |
+| Privileged | 특권 모드 | 커널/시스템                 |
+| Secure     | 보안 영역 | TrustZone secure world |
+PNSE         보호타입에 대한 확장
+PSELx         requester는 각 completer에 대해 PSELx 신호를 생성하며 데이터 전송이 요청됨 + completer가 선택됨을 나타냄
+PENABLE     enable
+PWRITE      방향 , high면 APB 쓰기 접근 low면 APB 읽기 접근
+PWDATA    쓰기 데이터, 데이터 버스는 PWRITE가 HIGH이고 쓰기 사이클동안 requester에 의해 구동됨
+PSTRB        write 스트로브, 어떤 바이트 레인들을 갱신할지 나타냄 쓰기 데이터 8비트당 스트로브 1개, 읽기 전송동안 활성화 되면 안됨
+PREADY     completer에 의해 APB 전송 확장에 이용됨
+PRDATA     읽기 데이터 PWRITE가 LOW일 때 읽기 사이클동안 선택된 completer 에 의해 구동됨
+PSLVERR    전송 에러, APB 전송에서 오류 상태를 나타내기 위해 completer가 HIGH로 활성화 가능
+PWAKEUP   APB 인터페이스와 관련된 활동을 나타냄
+PAUSER     사용자 요청 속성 최대 128비트 사용을 권장
+PWUSER    사용자 쓰기 데이터 속성 최대 DATA_WIDTH/2 비트폭 사용 권장
+PRUSER     사용자 읽기 데이터 속성 최대 DATA_WIDTH/2 비트폭 사용 권장
+PBUSER     사용자 반응 속성 최대 16비트폭을 갖도록 권장됨
+
+주소 버스
+APB 인터페이스는 읽기/쓰기 전송을 위해 단일 주소 버스(PADDR)을 가짐
+PADDR 은 byte 주소를 나타냄
+PADDR은 정돈되지 않은 데이터 너비를 가질 수 있으나 결과 예측불가
+
+데이터버스
+APB 프로토콜은 읽기 데이터를 위한 PWDATA, 쓰기 데이터를 위한 PRDATA, 총 두개의 독립된 데이터 버스를 가지면 8/16/32비트가 될 수 있음
+읽기 데이터와 쓰기 데이터는 그들만의 개인적은 handshake 신호를 가지지 않으므로 데이터 전송은 동시에 발생할 수 없음

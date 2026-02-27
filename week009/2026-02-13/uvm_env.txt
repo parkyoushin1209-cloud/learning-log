@@ -1,0 +1,45 @@
+
+
+class env extens uvm_env; // 보통 build, connect만 포함
+`uvm_component_utils(env);
+
+base_tester tester_h;
+coverage coverage_h;
+scoreboard scoreboard_h;
+
+function void build_phase(uvm_phase phase);
+tester_h = base_tester::type_id::create("tester_h", this); 
+// 베이스 테스터여도 문제 없는 이유 = base_tester를 place_holder로 사용하고 있기 때문 
+coverage_h = coverage::type_id::create("coverage_h", this);
+scoreboard_h = scoreboard::type_id::create("scoreboard_h", this);
+// <variable> = <class_name>::type_id::create("<variable>", this);
+// 변수 명        클래스 이름                  변수명 문자열로
+// 이 형식의 장점 -> 
+//1. 팩토리 결과를 캐스트할 필요 없음(자동 완성됨) => 정확한 타입 반환 가능
+//2. 컴파일러가 클래스 정의를 안 한 경우, 명칭에 오류가 있는 경우를 잡아냄
+//3. 컴파일러가 'uvm_component_utils()를 사용하지 않은 부분을 잡아냄
+endfunction
+
+function new(string name, uvm_component parent);
+super.new(name, parent);
+endfunction
+
+endclass
+
+class random_test extends uvm_test;
+`uvm_component_utils(random_test);
+
+env env_h;
+
+function void build_phase(uvm_phase phase);
+base_tester::type_id::set_type_override(random_tester::get_type()); 
+// <base_class_name>::type_id::set_type_override(<child_class_name>::get_type()) => 팩토리 오버라이드
+// random은 base의 서브이므로 필요시 uvm 팩토리가 언제든 base를 random으로 만들 수 있음
+env_h = env::type_id::create("env_h", this);
+endfunction
+
+function new(string name, uvm_component parent);
+super.new(name, parent);
+endfunction
+
+endclass

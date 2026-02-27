@@ -1,0 +1,59 @@
+#include <iostream>
+
+using namespace std;
+
+class B1 {
+public:
+	virtual void vf() { cout << "B1:vf\n"; }
+	void f() { cout << "B1:f\n"; }
+	virtual void pvf() = 0; // 외부에서는 정의 가능함
+};
+
+class D1 : public B1 { 
+public:
+	void vf() override{ cout << "D1:vf\n"; }
+	void f() { cout << "D1:f\n"; }
+	void pvf() {cout << "D1:pvf\n"; }
+};
+
+class B2 {
+public:
+	virtual void pvf() = 0;
+};
+
+class D21 :public B2 {
+	void pvf() override{ cout << s; }
+private:
+	string s = "D21:s\n";
+};
+
+class D22 : public B2 {
+	void pvf() override { cout << i; }
+private:
+	int i = 0;
+};
+
+void f(B2& b) {
+	b.pvf();
+}
+
+int main() {
+	/*B1 b;
+	b.vf();
+	b.f();*/ //추상 클래스는 객체 생성 불가능
+	D1 d;
+	d.vf(); //D1:vf
+	d.f(); // D1 : f
+	d.pvf(); // D1 : pvf
+	B1& b2 = d; 
+	// 위에서 : public B1이라고 안 하면 오류 기본적으로 private임
+	//private 상속이면 Base 부분이 외부에서 접근 불가 따라서 업캐스팅도 불가 
+	// private이어도 derived 내부에서 Base& b = *this; 형식은 가능
+	b2.vf(); //D1 : vf
+	b2.f(); //B1 : f
+	b2.pvf(); // D1 : pvf
+	D21 d21;
+	D22 d22;
+	f(d21);  // D21 : s
+	f(d22); // 0
+}

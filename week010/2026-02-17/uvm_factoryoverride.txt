@@ -1,0 +1,21 @@
+팩토리 오버라이드는 테스트 주도 구조 변경을 가능하게 하기 위해 존재한다 -> 생성 의존성 제거, 결합도 낮춤
+설계는 검정된 도구, 검증은 실험 환경 테스트환경은 driver, monitor, scoreboard 등 등 확장이 끊임 없이 일어남 -> 매번 코드 수정하면 대규코 프로젝트에서 유지보수 불가능해짐
+
+오버라이드 남용 시 디버깅이 힘들어짐 => 생성 시점에 실제 타입 결정(런타임 바인딩)
+겉으로 보면 driver 지만 실제로 error_driver, delay_driver 등등 다른 driver일 수도 있음
+=>
+override는 test 에서만, 전역 override 남용 안 함, factory.print()로 실제 생성 타입 확인, 타입 이름을 로그에 찍음
+팩토리 오버라이드 후 `uvm_info 사용 혹은 uvm_factory::get().print() => 팩토리 상태 통째로 출력
+driver, monitor, scoreboard build_phase 끝에 
+`uvm_info(get_name(), $sformatf("Type = %s", get_type_name(), UVM_LOW) 넣어두면 좋음
+
+compare( ) : 호출 위치(외부 코드), 역할(public API, do_compare 호출)
+do_compare( ) : 호출 위치(내부 구현), 역할(실제 필드 비교 구현, override용)
+=> 내부에서 compare 로 호출 가능
+
+테스트에서 시퀀스 생성은 run_phase가 원칙 => sequence가 준비 완료된 상태여야 하므로
+
+raise_objection 한 후 forever_loop 도는데 drop_objection 없으면 안 끝 남
+fork...join_none 있다면 안전장치로 wait fork 사용
+
+bins에서  [=2] 정확히 두 번 반복 되야함 [->2] 최소 2회 이상 반복해야함

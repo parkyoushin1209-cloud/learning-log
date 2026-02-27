@@ -1,0 +1,111 @@
+module top;
+   import uvm_pkg::*;
+   import   tinyalu_pkg::*;
+`include "tinyalu_macros.svh"
+`include "uvm_macros.svh"
+   
+ tinyalu_bfm       class_bfm(); // agent를 이용한 구동
+   
+ tinyalu class_dut (.A(class_bfm.A), .B(class_bfm.B), .op(class_bfm.op), 
+                    .clk(class_bfm.clk), .reset_n(class_bfm.reset_n), 
+                    .start(class_bfm.start), .done(class_bfm.done), 
+                    .result(class_bfm.result));
+
+ tinyalu_bfm       module_bfm();  // tester_module을 이용한 구동
+
+ tinyalu module_dut (.A(module_bfm.A), .B(module_bfm.B), .op(module_bfm.op), 
+                     .clk(module_bfm.clk), .reset_n(module_bfm.reset_n), 
+                     .start(module_bfm.start), .done(module_bfm.done), 
+                     .result(module_bfm.result));
+
+ tinyalu_tester_module stim_module(module_bfm);
+
+ initial begin
+  uvm_config_db #(virtual tinyalu_bfm)::set(null, "*", "class_bfm", class_bfm);
+  uvm_config_db #(virtual tinyalu_bfm)::set(null, "*", "module_bfm", module_bfm); // 두 개다 set
+  run_test("dual_test");
+ end
+   
+endmodule : top //  bfm 각각 정의 ,dut 인스턴스화 , bfm set  이 후 dual_test 실행
+
+
+class env_config;
+ virtual tinyalu_bfm class_bfm;
+ virtual tinyalu_bfm module_bfm;
+
+ function new(virtual tinyalu_bfm class_bfm, virtual tinyalu_bfm module_bfm); // 생성자로 두 개의 bfm을 받음
+    this.class_bfm = class_bfm;
+    this.module_bfm = module_bfm;
+ endfunction : new
+endclass : env_config // 두 개의 bfm을 생성자로 받아 설정
+
+
+class env extends uvm_env;
+   `uvm_component_utils(env);
+
+   tinyalu_agent        class_tinyalu_agent_h,  module_tinyalu_agent_h;
+   tinyalu_agent_config class_config_h, module_config_h;
+   
+   function new (string name, uvm_component parent);
+      super.new(name,parent);
+   endfunction : new
+
+   function void build_phase(uvm_phase phase);
+      virtual tinyalu_bfm class_bfm;
+      virtual tinyalu_bfm module_bfm;
+      env_config env_config_h;
+
+
+      
+      if(!uvm_config_db #(env_config)::get(this, "","config", env_config_h))
+        `uvm_fatal("RANDOM TEST", "Failed to get CLASS BFM");
+      
+      class_config_h  = new(.bfm(env_config_h.class_bfm),  .is_active(UVM_ACTIVE));   // 둘 중 하나만 구동해서 흐름 관찰하기 위해 
+      module_config_h = new(.bfm(env_config_h.module_bfm), .is_active(UVM_PASSIVE)); //active, passive 각각 사용
+      
+      uvm_config_db #(tinyalu_agent_config)::set(this, "class_tinyalu_agent_h*",  
+                                                 "config", class_config_h);
+      
+      uvm_config_db #(tinyalu_agent_config)::set(this, "module_tinyalu_agent_h*", 
+                                                 "config", module_config_h);
+
+
+
+      class_tinyalu_agent_h  = new("class_tinyalu_agent_h",this);
+      module_tinyalu_agent_h = new("module_tinyalu_agent_h",this);
+      
+   endfunction : build_phase
+   
+endclass
+
+
+
+class dual_test extends uvm_test; //uvm_test 에서 확장
+   `uvm_component_utils(dual_test);
+
+   env       env_h;
+   
+   function new (string name, uvm_component parent);
+      super.new(name,parent);
+   endfunction : new
+
+
+   function void build_phase(uvm_phase phase); // 빌드 페이즈만 가짐
+      
+      virtual tinyalu_bfm class_bfm, module_bfm;
+      env_config env_config_h;
+
+      if(!uvm_config_db #(virtual tinyalu_bfm)::get(this, "","class_bfm", class_bfm))   // class_bfm 얻기
+        `uvm_fatal("DUAL TEST", "Failed to get CLASS BFM");
+      if(!uvm_config_db #(virtual tinyalu_bfm)::get(this, "","module_bfm", module_bfm)) //module_bfm 얻기
+        `uvm_fatal("DUAL TEST", "Failed to get MODULE BFM");
+
+      env_config_h = new(.class_bfm(class_bfm), .module_bfm(module_bfm)); // env_config 생성
+      
+      uvm_config_db #(env_config)::set(this, "env_h*", "config", env_config_h); // 이후 set 해줌
+
+      env_h = env::type_id::create("env_h",this);
+   endfunction : build_phase
+
+
+endclass

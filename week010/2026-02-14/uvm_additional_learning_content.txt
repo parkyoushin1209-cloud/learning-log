@@ -1,0 +1,35 @@
+모니터는 bfm의 핸들로 지목돼있음
+분석 포트로 정보를 보내는 역할
+write_to_monitor로 보내는 정보 명령어 또는 결과 등을 보냄
+
+| 상황                | 추천                  |
+| ----------------- | ------------------- |
+| time-free thread  | `get()/put()` 써도 안전 |
+| run_phase 등 시간 소비 | 구조 확실하면 `get()` 가능  |
+| 데드락 가능성 있음        | `try_get()` 추천      |
+| polling 구조        | `try_get()`         | => 상대가 준비됐는지 주기적으로 확인하는 방식
+
+
+
+class env extends uvm_env;
+   `uvm_component_utils(env);
+
+   random_tester    random_tester_h;
+   coverage  coverage_h;
+   scoreboard scoreboard_h;
+   driver    driver_h;
+   command_monitor command_monitor_h;
+   result_monitor result_monitor_h;
+   uvm_tlm_fifo #(command_s) command_f;
+   
+
+   function void build_phase(uvm_phase phase);
+      command_f = new("command_f", this); // 이거만 new인 이유는 일반적으로 factory를 사용하지 않기 때문, 컴포넌트이긴 하나 일반적으로 오버라이드 대상이 아님, parameterized class는 factory create가 번거롭다
+      random_tester_h    = random_tester::type_id::create("random_tester_h",this);, 
+      driver_h    = driver::type_id::create("driver_h",this);
+      coverage_h  =  coverage::type_id::create ("coverage_h",this);
+      scoreboard_h = scoreboard::type_id::create("scoreboard_h",this);
+      command_monitor_h   = command_monitor::type_id::create("command_monitor_h",this);
+      result_monitor_h= result_monitor::type_id::create("result_monitor_h",this);
+      
+   endfunction : build_phase

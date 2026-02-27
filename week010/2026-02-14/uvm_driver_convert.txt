@@ -1,0 +1,73 @@
+class Driver extends uvm_component;
+`uvm_component_utils(Driver);
+
+uvm_get_port #(UNI_cell) get_port; //.peek()은 제공 안 함
+
+vUtopiaRx Rx;
+Driver_cbs cbsq[$];
+int PortID;
+//new로 메일 박스, 이벤트, 가상 인터퍼에스, portid 받았었음
+function new(string name, uvm_component parent);
+super.new(name, parent);
+endfunction
+
+function void build_phase(uvm_phase phase);
+if(!uvm_config_db #(vUtopiaRx) :: get(null, "*", "Rx", Rx))
+$fatal("Failed to get Rx");
+if(!uvm_config_db #(int) :: get(null, "*", "portid", PortID))
+$fatal("Failed to get PortID");
+get_port = new("get_port", this);
+endfunction
+
+task run_phase(uvm_phase phase);
+UNI_cell c;
+bit drop;
+
+Rx.cbr.data <= 0;
+Rx.cbr.soc  <= 0;
+Rx.cbr.clav <= 0;
+
+forever begin
+    get_port.get(c); //메일 박스의 앞에서 셀 읽기
+    begin: Tx  //전 전송 콜백
+    foreach(cbsq[i]) begin
+        cbsq[i].pre_tx(this, c, drop);
+        if(drop) disable Tx; // 이 셀 보내지 마
+    end
+
+    c.display($sformat("@%0t: Drv%0d: ", $time, PortID));
+    send(c);
+    foreach(cbsq[i])// 후 전송 콜백
+    cbsq[i].post_tx(this, c);
+    end : Tx
+
+    
+end
+endtask
+
+extern task send (input UNI_cell c);
+
+endclass
+
+
+task Driver::send(input UNI_cell c);
+ATMCellType Pkt;
+
+c.pack(Pkt);
+$write("Sending cell: ");
+foreach(Pkt.Mem[i])
+$write("%x ", Pkt.Mem[i]); $display;
+
+@(Rx.cbr);
+Rx.cbr.clav <= 1;
+for(int i=0; i <= 52; i++)begin
+    while (Rx.cbr.en === 1'b1) @(Rx.cbr); // enable 아니면 루프
+    //Assert start of cell, assert enable, send byte 0 (i==0)
+    Rx.cbr.soc <= (i == 0);
+    Rx.cbr.data <= Pkt.Mem[i];
+    @(Rx.cbr);
+end
+Rx.cbr.soc <= 'z;
+Rx.cbr.data <= 8'bx;
+Rx.cbr.clav <= 0;
+endtask

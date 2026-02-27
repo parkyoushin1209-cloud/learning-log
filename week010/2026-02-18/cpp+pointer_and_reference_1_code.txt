@@ -1,0 +1,71 @@
+
+#include <iostream>
+using namespace std;
+
+int main()
+{
+	cout << "bool" << '\t' << sizeof(bool); // 바이트 단위 메모리 크기 반환
+	int val = 17;
+	int* ptr = &val;//주소 저장(hex표기)
+	*ptr = 13; // 역참조
+	double* p = new double[4];// run time에 double 4개 할당 공간 할당 후 첫 double을 가리키는 포인터를 반환받음(new가 포인터 반환)
+
+
+	double* m = new double;
+	double* n = new double[1000];
+
+	n[700] = 7.7;
+	n = m;
+	double d = n[700]; // 구간 밖 접근 하나만 가리키므로 m의 객체를 가리키면 나머지 참조 불가
+
+	//정의된 클래스 타입에 대하여 기본 생성자가 없다면 Y* py = new Y 형식 불가 => 명시적으로 초기화 해야 함 Y{4};
+	double* p0; // 포인터 초기화 안 함 사용시 어느 공간을 바꿔버릴지 예측 불가
+	double* p1 = new double; // doulbe 초기화 안 함
+	double* p2 = new double{ 5.5 }; // double을 5.5로 초기화
+	double* p3 = new double[5]; // 초기화 안 한 double 5개
+	double* p4 = new double[5] {0, 1, 2, 3, 4}; // 초기값 리스트로 초기화도 가능
+	double* p5 = new double[] {0, 1, 2, 3, 4}; // 초기화 리스트가 있다면 [] 안이 비어있어도 문제 없음
+
+}
+
+    void* pv1 = new int;
+	void* pv2 = new double[10] 처럼 사용 가능
+
+	void f(void* pv){
+	void* pv2 = pv; // 복사는 가능
+	void* pv = double* pd; // 가능
+	double* pd = pv; // void*를 double*로 변환 불가
+	*pv = 7; // 역참조 불가(컴파일러가 void*의 타입을 모름)
+	pv[2] = 9; // 첨자 못 씀
+	int* pi = static_cast<int*>(pv) //ok. 명시적 변환
+	reinterpret_cast<타입>(이름) : 완전히 관계가 없는 (int, char*처럼) 타입 사이에도 캐스트 가능
+	const_cast<타입>(이름) : const를 지워버릴 수 있음
+
+
+	int x = 10;
+	int* p = &x;
+	*p = 7;
+	int y2 = *p;
+	int*p2 = &x2;
+	p2 = p; // p2, p 모두 x를 가리킴
+	p = &x2;
+
+	int y = 10;
+	int& r = y; // &이 타입 선언 쪽에 있음
+	r = 7; // r을 이용해 y에 대입
+	int y2 = r; // r을 이용해 y를 읽음
+	int& r2 = y; // 다른 int의 찹조를 얻음
+	r2 = r; // y의 값을 y2에 대입
+	r = &y2; //오류 참조자체의 값을 바꿀 수 없음 int& 에 int* 대입을 시도함
+
+	void rotate(Shape* s, int n); // 공개 기반 클래스의 경우 subclass*를 superclass*로 암묵적 변환이 가능함
+	Shape* p = new Circle{Point{100, 100}, 40};
+	Circle c{Point{200, 200}, 50};
+	rotate(p, 35)
+	rotate(&c, 45);
+
+	void rotate(Shape& s, int n);
+	Shape& r = c;
+	retate(r, 55);
+	rotate(*p, 65);
+	rotate(c, 75);

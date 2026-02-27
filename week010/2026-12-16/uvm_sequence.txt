@@ -1,0 +1,110 @@
+uvm 시퀀스는 테스트벤치 구조로부터 스티뮬러스를 분리해줌(동일한 구조로 여러가지 테스트를 실행할 수 있음)
+
+======================
+
+sequence(무엇을?) -> sequencer(중재/전달) -> driver(어떻게 신호로?) -> DUT
+
+sequence(트랙잰션 생성)
+body() 태스크를 가짐
+uvm_sequence 상속
+uvm_sequence_item 생성
+랜덤화 수행
+트랜잭션 흐름 제어
+uvm_Sequencer를 인자로 받고 시퀀스 완료시 반환하는 start() 메서드를 가짐
+
+sequencer 
+sequence와 driver 사이 중간 관리자, 여러 시퀀스 동시 실행 시 arbitration 수행 기본적으로 FIFO 이용
+
+driver 
+시퀀서로부터 item 받아옴
+DUT 인터페이스 신호로 변환
+
+데이터 흐름
+sequence.start(sequencer); //sequence 시작
+start_item(req);   //sequence -> sequencer 중재 요청 
+get_next_item(req)  // driver가 가져감
+driver가 DUT에 신호 인가
+item_done(); // 완료 통보
+finish_item(req) 언블락
+
+시퀀스는 시간 개념을 가짐 delay, fork, 병렬 실행 가능
+드라이버는 사이클 정확도 가짐 clk 기준 제어, 프로토콜 구현
+시퀀서는 타이밍 모름 단순 중재자
+
+=============================================================
+
+sequence_item에서 
+super.do_copy를 사용하는 이유 => 부모로부터 상속 받은 데이터 멤버까지 정확히 복사하기 위해 
+
+=====================================
+uvm_driver의 경우 seq_item_port를 가지며 uvm_sequencer에서 .seq_item_export로 받음
+driver.seq_item_port.connect(sequencer.seq_item_export)
+=> 드라이버와 연결을 위해 FIFO가 필요하지 않음
+
+==============================
+virtual sequence
+종종 여러 시퀀스를 직렬 또는 병렬로 실행해 다양한 동작을 조합할 필요가 있음 => 
+상위 시퀀스를 만들어 여기서 시퀀스.start(시퀀서) 사용하기 ,  상위 시퀀스의 body( ) 태스크 내부에 fork ... join을 사용해 병렬 실행 또는 순서대로 나열해 직렬 실행으로 만들 수 있음
+
+uvm_pkg는 uvm_top이라는 객체를 제공하며
+uvm_top은 uvm_root 타입이며 다양한 유틸리티로의 접근권을 제공한다
+유틸리티 중 하나로 find가 있으며 컴포넌트 객체의 이름을 문자열로 받고 그 컴포넌트의 핸들을 반환한다. , wildcard를 사용해 전체 계층 몰라도 찾기 가능
+uvm_component 타입 객체를 반환하므로 cast가 필요하다
+uvm_component_h = uvm_top.find("*.env_h.sequencer_h");
+uvm_component 타입 |                  | 문자열을 사용해 시퀀서의 핸들을 받을 수 있음
+
+========================
+베이스 테스트에서 env_h, sequencer_h를 선언 후 build에서 env_h 생성 end_of_elaboration에서 sequencer_h = env_h.sequencer_h  => 이후 테스트에서 시퀀스.start(시퀀서) 에 사용 가능
+
+class runall_sequence extends uvm_sequence #(uvm_sequence_item);
+   `uvm_object_utils(runall_sequence);
+
+   protected reset_sequence reset;
+   protected maxmult_sequence maxmult;
+   protected random_sequence random;
+   protected sequencer sequencer_h;
+   protected uvm_component uvm_component_h;
+   
+ function new(string name = "runall_sequence");
+   super.new(name);
+    
+    uvm_component_h =  uvm_top.find("*.env_h.sequencer_h");
+
+    if (uvm_component_h == null)
+     `uvm_fatal("RUNALL SEQUENCE", "Failed to get the sequencer")
+
+    if (!$cast(sequencer_h, uvm_component_h))
+      `uvm_fatal("RUNALL SEQUENCE", "Failed to cast from uvm_component_h.")
+      
+      
+    reset = reset_sequence::type_id::create("reset");
+    maxmult = maxmult_sequence::type_id::create("maxmult");
+    random = random_sequence::type_id::create("random");
+ endfunction : new
+
+ task body();
+    reset.start(sequencer_h);
+    maxmult.start(sequencer_h);
+    random.start(sequencer_h);
+ endtask : body
+   
+endclass : runall_sequence
+
+class full_test extends tinyalu_base_test;
+   `uvm_component_utils(full_test);
+   
+   runall_sequence runall_seq;
+
+   task run_phase(uvm_phase phase);
+      runall_seq = new("runall_seq");
+      phase.raise_objection(this);
+      runall_seq.start(null); // uvm_top.find("*.env_h.sequencer_h"); 사용 후 cast로 얻었음 => null 사용 가능
+      phase.drop_objection(this);
+   endtask : run_phase
+
+
+   function new (string name, uvm_component parent);
+      super.new(name,parent);
+   endfunction : new
+
+endclass

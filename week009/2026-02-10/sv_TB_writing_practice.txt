@@ -1,0 +1,533 @@
+/* 레이어드 테스트벤치 구조 요구
+레이어	역할
+Interface / Signals	ALU 입력/출력 시그널 정의
+Driver Layer	a, b, op 값을 생성해서 ALU에 적용
+Checker Layer	ALU 출력 y가 예상값과 맞는지 확인
+Test Sequence Layer	다양한 연산 케이스 순서대로 실행
+00=ADD, 01=SUB, 10=AND, 11=OR
+테스트 케이스
+
+a	b	op	예상 y
+5	3	ADD	8
+10	4	SUB	6
+6	3	AND	2
+6	3	OR	7
+*/
+
+`define SV_RAND_CHECK(r)\
+do begin\
+if(!r) begin
+    $display("%s:%0d:Randomization failed"\%s\"",\
+    `__FILE__,`__LINE__,`"r`");\
+    $finish;\
+end\
+end while(0)
+
+`timescale 1ns/1ps
+
+
+interface ifc_bus(input logic clk_in);
+
+logic [7:0] a, b, y;
+logic [1:0] op;
+Trans_type cell;
+logic [17:0] data;
+
+modport DUT(input a, b, op,
+            output y);
+
+modport TEST(input y,
+             output a, b, op);
+
+clocking cbr @(posedge clk_in);
+input Trans_type cell;
+output data; // BaseTr이 input이면 서브클래스도 신호로 넣을 수 있음
+endclocking
+
+modport Rx(clocking cbr);
+
+clocking cbt @(posedge clk_in);
+output Trans_type cell;
+input data;
+endclocking
+
+modport Tx(clocking cbt);
+
+endinterface
+
+module alu_8bit (ifc_bus.DUT bus, input logic clk, rst);
+
+    always @(posedge clk) begin
+    if(rst) bus.y <= 0;
+    else begin
+       case(bus.op)
+            2'b00: bus.y <= bus.a + bus.b;
+            2'b01: bus.y <= bus.a - bus.b;
+            2'b10: bus.y <= bus.a & bus.b;
+            2'b11: bus.y <= bus.a | bus.b;
+        endcase
+    end
+    end
+endmodule
+
+typedef virtual ifc_bus.TEST Vtb;
+typedef virtual ifc_bus.Rx VRx;
+typedef virtual ifc_bus.Tx VTx;
+
+module top();
+logic clk,rst;
+logic clk_out;
+initial begin
+clk = 0;
+forever #5ns clk = ~clk;
+end
+
+initial begin
+    rst = 0;
+    #6ns rst = 1;
+    #5ns rst = 0;
+end
+
+Clk_generator cgen(clk_out);
+ifc_bus ifc(clk_out);
+ifc_bus Rx(clk_out);
+ifc_bus Tx(clk_out);
+
+alu_8bit alu(ifc, clk, rst);
+Test test(ifc, Rx, Tx, rst);
+endmodule
+
+module Clk_generator(output logic clk);
+logic local_clk;
+assign clk = local_clk;
+
+initial begin
+local_clk = 0;
+forever #10ns local_clk = ~local_clk;
+end
+
+endmodule
+
+
+program automatic Test(ifc_bus.TEST bus,
+                       ifc_bus.Rx Rx,
+                       ifc_bus.Tx Tx,
+                       input logic rst);
+Environment env;
+
+
+
+initial begin
+    env = new(bus, Rx, Tx);
+    env.gen_cfg();
+    env.build();
+
+    begin
+    Cov_mon_cbs cmc = new(env.cov);
+    env.mon.cbsq.push_back(cmc);
+    end
+
+    env.run();
+    env.wrap_up();
+end
+endprogram
+
+
+
+
+class Environment; // 환경 생성자에서는 메일 박스를 따로 받을 필요가 없음
+Driver drv;
+Generator gen;
+Scoreboard scb;
+Monitor mon;
+mailbox gen2drv;
+event drv2gen;
+Vtb bus_tb;
+VRx Rx;
+VTx Tx;
+Config cfg;
+Coverage cov;
+
+extern function void new(input Vtb bus_tb,
+                         input VRx Rx,
+                         input VTx Tx);
+extern virtual function void gen_cfg();
+extern virtual function void build();
+extern virtual task run();
+extern virtual function void wrap_up();
+extern virtual function void gen_clk();
+endclass
+
+function void Environment::new(input Vtb bus_tb,
+                               input VRx Rx,
+                               input VTx Tx);
+this.bus_tb = bus_tb;
+this.Rx = Rx;
+this.Tx = Tx;
+cfg = new();
+endfunction
+
+function void Environment::gen_cfg();
+`SV_RAND_CHECK(cfg.randomize());
+endfunction
+
+function void Environment::build();
+gen2drv = new(); //drv, gen보다 먼저 생성해주기
+drv = new(gen2drv, drv2gen, Rx); // 여기서 메일박스, 이벤트 넣어주기 
+gen = new(gen2drv, drv2gen);
+scb = new(cfg); // cfg 넣기
+mon = new(Tx);
+cov = new();
+
+begin  //콜백 등록은 여기서
+    Scb_drv_cbs sdc = new(scb);
+    Scb_mon_cbs smc = new(scb);
+    drv.cbsq.push_back(sdc);
+    mon.cbsq.push_back(smc);
+end
+
+begin  //initial은 붙이면 안 됨
+    Cov_mon_cbs cmc = new(cov);
+    mon.cbsq.push_back(cmc);
+end
+
+endfunction
+
+
+task Environment::run();
+fork 
+drv.run();
+gen.run();
+mon.run();
+scb.run();
+cov.run();
+join
+endtask
+
+function void Environment::wrap_up();
+$display("@%0t: End of sim, %0d errors, %0d warnings", $time, cfg.nErrors, cfg.nWarnings);
+scb.wrap_up();
+endfunction
+
+//드라이버, 제너레이터, 스코어보드, 모니터, 환경 객체
+// run, new, base callback(mon, cov, drv), transaction, 
+typedef class Driver;
+
+class Driver_cbs;
+virtual task pre_tx();
+endtask
+
+virtual task post_tx(input BaseTr tr);
+endtask
+endclass
+
+class Scb_drv_cbs extends Driver_cbs;
+Scoreboard scb; // 스코어보드에 연결해서 함수 사용하기
+
+function void new(input Scoreboard scb);
+this.scb = scb;
+endfunction
+
+virtual task post_tx(input BaseTr tr);
+scb.save_expect(tr);
+endtask
+endclass
+
+typedef class Monitor;
+
+class Monitor_cbs;
+virtual task pre_tx();
+endtask
+
+virtual task post_tx();
+endtask
+endclass
+
+class Scb_mon_cbs extends Monitor_cbs;
+Scoreboard scb;
+
+function void new(input Scoreboard scb);
+this.scb = scb;
+endfunction
+
+virtual task post_tx(input BaseTr tr);
+scb.check_actual(tr);
+endtask
+endclass
+
+class Config;
+int nErrors, nWarnings;
+rand bit [31:0] nTrans;
+
+constraint nTrans_valid{
+    0 < nTrans;
+    nTrans < 1000; 
+}
+
+endclass
+
+typedef struct packed{
+bit[7:0] a, b;
+bit[1:0] op;
+} trantype; //18바이트
+
+typedef union packed{
+trantype Tr;
+bit[17:0] Mem; //[0:8][1:0]이 [8:0][1:0]보다 인덱스 방향이 명황해 읽기 쉬움 0 1 2 3...[1:2](전자)  8 7 6 5....[1:2](후자)   
+} Trans_type;
+
+class BaseTr; // 빈 상태로 두어 구현 의존성을 없애 다형성을 지킴
+endclass
+
+class Transaction extends BaseTr; // pack, unpack
+rand bit[7:0] a,b;
+rand bit[1:0] op;
+
+virtual function BaseTr copy(input BaseTr to = null); // BaseTr의 입력에 null 넣고 상황에 따라 new() or cast
+if(to == null) copy.new();
+else $cast(copy, to);
+copy.a = this.a;
+copy.b = this.b;
+copy.op = this.op;
+return copy;
+endfunction
+
+virtual function bit compare(input BaseTr to);
+Transaction t;
+$cast(t, to);
+if(this.a  !=  t.a) return 0;
+if(this.b  !=  t.b) return 0;
+if(this.op !=  t.op) return 0;
+return 1;
+endfunction
+
+virtual function void pack(output Trans_type to); // 밖으로 보내므로 output으로
+to.trantype.a  =  this.a;
+to.trantype.b  =  this.b;
+to.trantype.op =  this.op;
+endfunction
+
+virtual function void unpack(input Trans_type from);
+this.a  =  from.trantype.a;
+this.b  =  from.trantype.b;
+this.op =  from.trantype.op;
+endfunction
+endclass
+
+class Generator;
+mailbox gen2drv;
+event drv2gen;
+int nTrans; // 여기에 나옴 => 트랜잭션을 nTrans번 반복할 수 있도록
+BaseTr blueprint;
+
+function void new(input mailbox mbx, input event ev, input int nTrans);
+this.gen2drv = mbx;
+this.drv2gen = ev;
+this.nTrans = nTrans;
+blueprint = new();
+endfunction
+
+task run();
+repeat(nTrans) begin
+BaseTr tr;
+`SV_RAND_CHECK(blueprint.randomize());
+$cast(tr, blueprint.copy());
+gen2drv.put(tr);
+@drv2gen;
+end
+endtask
+
+endclass // generator에 wrap_up 없음
+
+class Driver; // 드라이버, 모니터, 환경 객체에는 virtual ifc 만들고 top에서 받기
+mailbox gen2drv;
+event drv2gen;
+Driver_cbs cbsq[$];
+VRx Rx;
+
+function void new(input mailbox gen2drv, input event drv2gen, input VRx Rx);
+this.gen2drv = gen2drv;
+this.drv2gen = drv2gen;
+this.Rx = Rx;
+endfunction
+
+task run();
+BaseTr t;
+
+forever begin // 
+    gen2drv.peek(t);
+    begin : Tx
+    foreach(cbsq[i]) begin
+    cbsq[i].pre_tx(); // 콜백에 적용하는거니 cbsq[i].pre로
+    end
+
+    send(t);
+
+    foreach(cbsq[i]) 
+        cbsq[i].post_tx(t);
+    end : Tx
+
+    gen2drv.get(t);
+    ->drv2gen;
+end
+endtask
+
+task send(input BaseTr t);
+Trans_type tt;
+t.pack(tt);
+
+@(Rx.cbr)
+Rx.cbr.data = tt.Mem;
+@(Rx.cbr)
+endtask
+endclass
+
+class Monitor;
+Monitor_cbs cbsq[$];
+VTx Tx;
+
+function new(input VTx Tx);
+this.Tx = Tx;
+endfunction
+
+task run();
+BaseTr tr;
+
+forever begin
+receive(tr);
+foreach(cbsq[i]) cbsq[i].post_tx(tr);
+end
+endtask
+
+task receive(output BaseTr tr);
+Trans_type tt;
+
+@(Tx.cbt)
+#1 tt.Mem = Tx.cbt.data;
+@(Tx.cbt)
+
+tr = new();
+tt.unpack(tr);
+
+endtask
+endclass
+
+class expect_trans;
+BaseTr q[$];
+
+endclass
+
+
+class Scoreboard;
+Config cfg;
+int iexpect, iactual;
+Transaction actual;
+Transaction expect;
+expect_trans et;
+
+extern function void new(input Config cfg);
+extern function void wrap_up();
+extern function void save_expect(input BaseTr tr);
+extern function void check_actual(input BaseTr tr);
+endclass
+
+function void Scoreboard::new(input Config cfg);
+this.cfg = cfg;
+et = new();
+endfunction
+
+function void Scoreboard::save_expect(input BaseTr tr);
+iexpect++;
+et.q.push_back(tr);
+endfunction
+
+function void Scoreboard::check_actual(input BaseTr tr);
+if(et.q.size() == 0) begin
+$display("ERROR: Trans not found, SCB TX empty");
+cfg.nErrors++;
+return;
+end
+
+iactual++;
+
+foreach(et.q[i]) begin
+if(tr.compare(et.q[i])) begin
+    $display("Match found for Trans");
+    et.q.delete(i);
+    return;
+end
+end
+/* 여러개 찾아야할 경우 reverse loop 이용
+for(int i = et.q.size()-1; i >=0; i--) begin
+    if(tr.compare(et.q[i])) begin
+        $display("Match found for Trans");
+        et.q.delete(i);
+        return;
+    end
+end
+
+*/
+
+display("ERROR: Trans not found");
+cfg.nErrors++;
+endfunction
+
+function void Scoreboard::wrap_up(); // 예상, 출력 개수 출력
+$display("@%0t: %m %0d expected Trans, %0d actual Trans rcvd", $time, iexpect, iactual);
+
+if(et.q.size()) begin
+$display("Trans in SCB TX at the end of test");
+cfg.nErrors++;
+end
+endfunction
+
+
+class Cov_mon_cbs extends Monitor_cbs;
+Coverage cov;
+
+function void new(input Coverage cov);
+this.cov = cov;
+endfunction
+
+task post_tx(input BaseTr t);
+Transaction tr;
+$cast(tr, t);
+cov.sample(tr);
+endtask
+
+endclass
+
+
+class coverage;
+bit[7:0] a, b;
+bit[1:0] op;
+
+covergroup cg;
+a : coverpoint a{
+    option.weight = 0;
+}
+b : coverpoint b{
+    option.weight = 0;
+}
+op : coverpoint op{
+    option.weight = 0;
+}
+cross a, b, op;
+endgroup
+
+cg cg_inst;
+
+function void new()
+cg_inst = new();
+endfunction
+
+  function void sample(input Transaction tr);  /////sample은 랜덤화가 아님 현재 값을 기록한다고 보면 됨
+this.a = tr.a;
+this.b = tr.b;
+this.op = tr.op;
+
+$display("@%0t coverage: a=%d b=%d op=%b",$time, a, b, op);
+cg_inst.sample();
+endfunction
+
+endclass

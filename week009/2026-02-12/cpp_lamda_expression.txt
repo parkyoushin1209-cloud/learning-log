@@ -1,0 +1,35 @@
+#include <iostream>
+#include <cmath>
+#include <functional>
+using namespace std;
+
+double one(double) {
+	return 1;
+}
+
+int main() {
+	double c = [](double x)-> double {return cos(x) + sin(x); }; 
+	람다표현식 => 인자로 사용할 이름이 없는 함수를 필요한 곳에서 바로 정의 가능
+	  람다는 값이 아니라 함수 객체임
+	  반환 타입은 몸체로 유추하나 필요시 명시해도 됨
+	  오류, 혼란의 원이이 되지 않을 정도로 간단해야 해서 명시하는 일을 많지 않을 것
+	  한 두 줄정도에 들어가지 않으면 이름 있는 함수로 정의하기
+	  람다 개시자 이용시 람다 표현식 안에서 지역 변수에 접근 가능함
+	람다 사용법
+	//1. 변수에 저장
+	auto c = [](double x) -> double {
+	return cos(x) + sin(x);
+};
+	double result = c(1.0);
+
+	// 2. 바로 호출
+	double c = [](double x) {
+		return cos(x) + sin(x);
+		}(1.0);
+
+	// 3. std::function 사용
+	function<double(double)> c = [](double x) { return cos(x) + sin(x); };
+
+	//Function e{[n](oduble x){return expo(x,n);} => 인자를 두 개 받음 n은 Function 생성될 때 지역 변수 값을 받고 x는 인자 값 가짐 
+}
+

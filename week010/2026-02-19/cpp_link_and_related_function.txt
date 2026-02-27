@@ -1,0 +1,170 @@
+struct Link {
+	string value;
+	Link* prev;
+	Link* succ;
+	Link(const string& v, Link* p, Link* s)
+		:value{v}, prev{p}, succ{s}{ }
+	Link(const string& v)
+		:value{v}, prev{nullptr}, succ{nullptr}{ }
+
+
+};
+
+Link* insert(Link* p, Link* n) { // 링크 삽입
+	if (p == nullptr) return n;
+	if (n == nullptr)return p;
+	n->succ = p;
+	if (p->prev) p->prev->succ = n; // p->prev가 존재하면 연결
+	n->prev = p->prev;
+	p->prev = n;
+	return n; // 추가 삽입할 노드 반환
+	// n의 앞뒤로만 연결 제대로 해주기 (t->n->p) 이므로 t->succ, p->prev, n->prev/succ만
+
+}
+
+Link* add(Link* p, Link* n) { // n을 p 뒤에 삽입하고 n을 반환
+	if (p == nullptr) return n;
+	if (n == nullptr) return p;
+	n->succ = p->succ;
+	n->prev = p;
+	if (p->succ != nullptr)
+		p->succ->prev = n;
+	p->succ = n;
+	return n;
+}
+
+Link* erase(Link* p) {
+	if (p == nullptr) return nullptr;
+	if (p->succ) p->succ->prev = p->prev;
+	if (p->prev) p->prev->succ = p->succ;
+	return p->succ;
+}
+
+Link* find(Link* p, const string& s) {
+	while (p) {
+		if (p->value == s)return p;
+		p = p->succ;
+	}
+	return nullptr;
+}
+
+Link* advance(Link* p, int n) {
+	if (p == nullptr) return nullptr;
+	if (n > 0) {
+		while (n--) { // 후미 연산자 => 한 번 실행 후 감소한 뒤 검사
+			if (p->succ == nullptr) return nullptr;
+			p = p->succ;
+		}
+	}
+	else if (n < 0) {
+		while (n++) {
+			if (p->prev == nullptr) return nullptr;
+			p = p->prev;
+		}
+	}
+	return p;
+}
+
+void print_all(Link* p) {
+	cout << "{ ";
+	while (p) {
+		cout << p->value;
+		if (p = p->succ) cout << ", ";
+	}
+	cout << " }";
+}
+int main()
+{
+	Link* norse_gods = new Link{ "Thor" };
+	norse_gods = insert(norse_gods, new Link{ "Odin" });
+	norse_gods = insert(norse_gods, new Link{ "Zeus" }); // 제우스는 북유럽이 아닌 그리스 신임 => 수정
+	norse_gods = insert(norse_gods, new Link{ "Freia" });
+
+	Link* greek_gods = new Link{ "Hera" };
+	greek_gods = insert(greek_gods, new Link{ "Athena" });
+	greek_gods = insert(greek_gods, new Link{ "Mars" }); // Mars => Ares로 수정
+	greek_gods = insert(greek_gods, new Link{ "Poseidon" });
+
+
+	Link* p = find(greek_gods, "Mars");
+	if (p) p->value = "Ares";
+
+	Link* q = find(norse_gods, "Zeus");
+	if (q) {
+		if (q == norse_gods) norse_gods = q->succ; // p가 norse_god을 가리킨다면 포인터 대상을 변경(안 하면 포인터 norse_god 무의미해짐
+		erase(q);
+		greek_gods = insert(greek_gods, q); // greek_gods = 을 붙여서 확실하게
+	}
+	print_all(norse_gods);
+	cout << "\n";
+
+	print_all(greek_gods);
+	cout << "\n";
+}
+
+
+/*
+//Link* norse_gods = new Link{ "Thor", nullptr, nullptr };
+	//norse_gods = new Link{ "Odin", nullptr, norse_gods };
+	//norse_gods->succ->prev = norse_gods;
+
+	Link* norse_gods = new Link {"Thor",nullptr,nullptr};
+	norse_gods = insert(norse_gods, new Link{ "Odin", nullptr, nullptr });
+
+	
+
+*/ 스트림은 반드시 참조형으로 받아야 함 istream& read(istream& is) 형식
+istream은 추상 클래스임 istream is; = 오류
+
+strlen 은 문자열(char* 또는 char[]에만 적용됨)
+일반 문자열은 s.size() 또는 s.length() 이용
+
+
+
+void to_lower(char* s) {
+	while (*s) {
+		*s = static_cast<unsigned char>(*s);
+		s++;
+	}
+}
+
+char* my_strdup(const char* s) {
+	if (s == nullptr) return nullptr;
+
+	const char* l = s;
+	int len = 0;
+	while (l) {
+		len++;
+		l++;
+	}
+
+	char* p = new char[len + 1];
+
+	for (int i = 0; i < len; i++)
+		p[i] = s[i];
+
+	p[len] = '\0';
+	return p;
+}
+
+const char* findx(const char* s, const char* x) {
+	if (!s || !x) return nullptr;
+
+	while (*s) {
+		const char* p = s;
+		const char* dx = x;
+
+		while (*dx && *p == *dx) {
+			p++;
+			dx++;
+		}
+
+		if (*dx == '\0') return s;  // 찾음
+		s++;  // 다음 문자로 이동
+	}
+
+	return nullptr;  // 못 찾음
+}
+
+this는 직접 수정 불가능함 => Link* p = this로 해두고 p를 이용해 조작하기
+const Link*를 Link*로 변환해야 하면 const_static 이용하기

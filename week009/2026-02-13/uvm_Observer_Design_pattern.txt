@@ -1,0 +1,176 @@
+uvm_analysis_port: 객체에게 (구독자 집합에게 데이터를 보낼 ) 길을 제공
+uvm_subscriber : uvm_component를 확장해 구성 요소가 uvm_analysis_port를 구독할 수 있게 해줌
+
+1. 분석 포트를 저장할 변수 선언 및 이를 통과할 변수의 데이터 타입 지정
+2. 빌드 페이즈에서 분석 포트 인스턴스화
+3. write메서드를 이용해 분석 포트에 데이터 작성
+4. 포트에 데이터를 작성했으면 모든 구독자에게 감
+
+
+분석 포트는 connect라는 메서드를 가지며 구독자를 포트로 연결한다.
+인자로 analysis_export 객체 하나만을 가진다.
+
+class average extends uvm_subscriber #(int); // uvm_component => uvm_subscriber #(int) 로 수정
+   `uvm_component_utils(average);
+
+   real dice_total;
+   real count;
+
+   function new(string name, uvm_component parent = null);
+      super.new(name,parent);
+      dice_total = 0.0;
+      count = 0.0;
+   endfunction : new
+
+   function void write(int t); // 이 메서드를 이용해 데이터 수집 가능, 인자의 타입은 uvm_subscriber에 나와있는 것과 같아야 함
+      dice_total = dice_total + t; // write에서는 각각의 목적에 맞는 행위를 함
+      count++;
+   endfunction : write
+
+   function void report_phase(uvm_phase phase); // 시뮬레이션이 완료된 후 리포트 페이즈를 실행해 결과 확인 가능
+      
+      $display ("DICE AVERAGE: %2.1f",dice_total/count);
+   endfunction : report_phase
+   
+endclass : average
+
+
+
+class coverage extends uvm_subscriber#(int); // 각 컴포넌트에 대해 반복
+   `uvm_component_utils(coverage);
+   int the_roll;
+
+   covergroup dice_cg;
+      coverpoint the_roll{
+         bins  twod6[] = {2,3,4,5,6,7,8,9,10,11,12};}
+   endgroup
+
+
+   function new(string name, uvm_component parent = null);
+      super.new(name,parent);
+      dice_cg = new();
+   endfunction : new
+   
+
+   function void write (int t);
+      the_roll = t;
+      dice_cg.sample();
+   endfunction : write
+
+   function void report_phase(uvm_phase phase);
+      
+     $display("\nCOVERAGE: %2.0f%% ", dice_cg.get_coverage());
+   endfunction : report_phase
+endclass : coverage
+
+
+
+
+class histogram extends uvm_subscriber #(int);
+   `uvm_component_utils(histogram);
+
+   int rolls[int];
+   
+
+   function new(string name, uvm_component parent);
+      super.new(name,parent);
+      for (int ii = 2; ii <= 12; ii++) rolls[ii] = 0;
+   endfunction : new
+   
+   function void write(int t);
+      rolls[t]++;
+   endfunction : write
+
+
+   function void report_phase(uvm_phase phase);
+      string bar;
+      string message;
+      
+      message = "\n";
+      foreach (rolls[ii]) begin
+         string roll_msg;
+         bar = "";
+         repeat (rolls[ii]) bar = {bar,"#"};
+         roll_msg = $sformatf( "%2d: %s\n", ii, bar);
+         message = {message,roll_msg};
+      end
+      $display(message);
+   endfunction : report_phase
+endclass : histogram
+
+
+
+
+class dice_roller extends uvm_component;
+   `uvm_component_utils(dice_roller);
+
+   uvm_analysis_port #(int) roll_ap; // uvm_analysis_port로 subscriber에게 정보를 전해주는 통로 역할
+
+   function void build_phase (uvm_phase phase);
+      
+      roll_ap = new("roll_ap",this); // build 페이즈에서 생성하기
+      
+   endfunction : build_phase
+   
+   rand byte die1;
+   rand byte die2;
+   
+   constraint d6 { die1 >= 1; die1 <= 6; 
+                   die2 >= 1; die2 <= 6; }
+
+
+   task run_phase(uvm_phase phase);
+      int the_roll;
+      phase.raise_objection(this);
+      void'(randomize());
+      repeat (20) begin
+         void'(randomize());
+         the_roll = die1 + die2;
+         roll_ap.write(the_roll); // write를 사용시 구성요소들의 write도 호출되어 결과를 전달할 수 있개 됨
+      end
+      phase.drop_objection(this);
+   endtask : run_phase
+   
+
+
+   function new(string name, uvm_component parent);
+      super.new(name,parent);
+   endfunction : new
+   
+endclass : dice_roller
+
+
+
+
+class dice_test extends uvm_test;
+   `uvm_component_utils(dice_test);
+
+   dice_roller dice_roller_h;
+   coverage coverage_h;
+   histogram histogram_h;
+   average average_h;
+
+   function void connect_phase(uvm_phase phase);
+      dice_roller_h.roll_ap.connect(coverage_h.analysis_export); // uvm_analysis_port 는 connet 메서드를 갖고 있어 정보 전달 가능
+      dice_roller_h.roll_ap.connect(histogram_h.analysis_export);    //각각의 subscriber 컴포넌트들은 analysis_export 객체를 가짐
+      dice_roller_h.roll_ap.connect(average_h.analysis_export);
+   endfunction : connect_phase
+   
+      
+   function new(string name, uvm_component parent);
+      super.new(name,parent);
+   endfunction : new
+
+
+   function void build_phase(uvm_phase phase);
+      
+      
+      dice_roller_h = new("dice_roller_h", this);
+      coverage_h = new("coverage_h", this);   
+      histogram_h = new("histogram_h",this);
+      average_h     = new("average_h",this);
+
+   endfunction : build_phase
+
+
+endclass : dice_test

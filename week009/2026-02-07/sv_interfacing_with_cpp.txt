@@ -1,0 +1,104 @@
+c++의 객체 내부 함수의 경우 객체가 링커가 실행되는 시간동안 존재하지 않으므로 호출이 불가능하다 => 주소가 고정된 함수를 생성하기(전역 함수/static 함수/DLL / shared library에 있는 함수
+/DPI-C로 import된 함수)
+  
+  extern "c" => c++컴파일러에게 c호출 관습을 따라야 하며, name manglin(심볼 이름에 타입/스코프 벙보를 섞는 것)을 사용하지 말라고 알려줌
+  sv에 의해 호출되는 함수 전에 두거나 extern "C" { 함수 set}로 둘 수도 있음
+
+  신호레벨에서 통신할 경우 입력값의 변화가 없더라도 매 클럭 사이클에서 함수가 호출됨 => 트랜잭션 레벨 사용하기
+  class Counter7{ //Counter7 class 정의
+    public:
+    Counter7();
+    void count();
+    void load(const svBitVecVal* i);
+    void reset();
+    int get();
+    private:
+    unsigned char cnt;
+};
+
+Counter7::Counter7{
+    cnt = 0;
+}
+
+void Counter7::count(){
+    cnt = cnt + 1;
+}
+
+void Counter7::load(const svBitVecVal* i){
+    cnt = *i;
+    cnt &= 0x7f;
+}
+
+void Counter7::reset(){
+    cnt = 0;
+}
+
+int Counter7::get(){
+return cnt;
+}
+
+#ifdef _cplusplus //_cplusplus가 정의돼있으면
+    extern "C" { //extern "C" { }로 묶음
+#endif
+// 각 함수가 static메서드 안에 wrap_up 돼있음, 트랜잭션 레벨
+void* Counter7_new(){
+    return new Counter7;
+}
+
+void Counter7_count(void* inst){
+    Counter7* c7 = (Counter7*) inst;
+    c7->count();
+}
+
+void Counter7_load(void* inst, const svBitVecVal* i){
+    Counter7* c7 = (Counter7*) inst;
+    c7->load(i);
+}
+
+void Counter7_reset(void* inst){
+    Counter7* c7 = (Counter7*) inst;
+    c7->reset();
+}
+
+int Counter7_get(void* inst){
+    Counter7* c7 = (Counter7*) inst;
+    c7->get();
+}
+
+#ifdef _cplusplus
+}
+#endif
+===============================
+//sv 코드 
+import "DPI-C" function chandle Counter7_new();
+import "DPI-C" function void Counter7_count(void* inst);
+import "DPI-C" function void Counter7_load(void* inst, const svBitVecVal* i);
+import "DPI-C" function void Counter7_reset(void* inst);
+import "DPI-C" function int Counter7_get(void* inst);
+
+class Counter7;
+chandle inst;
+
+function chandle new(); // 얘는 알아서 이름 짓기
+inst = Counter7_new(); // 이거만 가져온 형식 따르면 됨
+endfunction
+
+function void count();
+Counter7_count(inst);
+endfunction
+
+function void load(input bit[6:0] val);
+Counter7_load(inst, val);
+endfunction
+
+function void reset();
+Counter7_reset(inst);
+endfunction
+
+  function bit[6:0] get();     //  int형을 반환함 bit[6:0]은 svBitVecVal을 가리키는 포인터를 반환해야 할 수도 있으나
+    return Counter7_get(inst); // 포인터 반환은 불가능하며 다음의 타입들만 반환 가능 => c의 기본 스칼라 범위와 일치하지 않음 bit[6:0]은 7비트임
+  endfunction                    // void, byte, shortint, int, longint, real, shortreal, chandle, string, bit/logic(single_bit)
+
+endclass
+
+=> 인스턴스화해서 사용

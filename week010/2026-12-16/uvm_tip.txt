@@ -1,0 +1,47 @@
+set(context, inst_name, field_name, value)
+
+context : 설정을 어디 기준으로 저장할지를 의미(이 컴포넌트 아래 계층에서 이 설정을 볼 수 있음)
+
+inst_name(적용 대상 인스턴스 경로) : 이 설정이 어느 컴포넌트에 적용 될지("ABC*" = ABC로 시작하는 모든 하위 컴포넌트에 적용) module_tinyalu_agent_h_0 module_tinyalu_agent_h_abc 등
+비어있으면 현재 주소를 기준으로 찾아라 없으면 부모로 올라가서
+
+filed_name : config DB에서 key역할, 나중에 get() 할 때 이 이름으로 찾음
+
+value : 실제 저장할 값 , 클래스 타입의 객체 핸들
+
+uvm_config_db #(tinyalu_agent_config)::
+set(this, "module_tinyalu_agent_h*", "config",module_config_h); 
+
+===========================================================
+
+보통 test 클래스의 run_phase에서 phase.raise_objection(), phase ,drop_objection() 메서드를 호출함
+
+===========================================================
+
+문장 생성 매크로 -> 세미콜론 필요 => REPORT, FATAL, ERROR
+선언/등장 블록 -> 세미콜론 없음
+
+==========================================================
+
+write_to_monitor는 기본적인 타입을 받아 변환 후 write해줌
+
+==========================================================
+
+어써션 , fatal 사용시기 구분
+RTL protocol -> SVA + $error/$fatal
+TB functional check -> uvm_error
+정말 치명적인 경우만 uvm_fatal
+ regression 많이 돌릴 환경이면 uvm_fatal 남발 안 함
+
+message id string의 경우
+타입 기반 에러 -> get_type_name( )
+인스턴스 기반 에러 -> get_name( )
+계층/복잡한 에러 -> get_full_name( )
+
+$fatal에서 숫자 의미
+0 -> 현재 시뮬레이션 타임까지 실행 후 종료
+1 -> 즉시 종료
+2 -> 즉시 종료 + 코어 덤프 등 툴 의존동작
+
+====================================
+

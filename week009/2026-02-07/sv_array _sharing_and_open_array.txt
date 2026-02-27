@@ -1,0 +1,99 @@
+void fib(svBitVecVal data[20]){ 
+  int i; //
+    data[0] = 1;
+    data[1] = 1;
+    for(int i= 2; i <20 ; i++)
+    data[i] = data[i-1] + data[i-2];
+}
+
+====================================== 2-state
+
+sv
+import "DPI-C" function void fib(output bit[31:0] data[20]);
+
+program automatic test;
+bit[31:0] data[20];
+
+initial begin
+    fib(data);
+    foreach(data[i]) $display(i,,data[i]);
+end
+endprogram
+
+void fib(svLogicVecVal data[20]){
+    data[0].aval = 1;
+    data[1].aval = 1;
+    data[0].bval = 0;
+    data[1].bval = 0;
+    for(int i=2; i<20;i++){
+      data[i].aval = data[i-1].aval + data[i-2].aval; // aval은 비트 벡터이며 실질적인 값을 나타냄 aval[0]는 상태를 나타내시도 하며 값을 나타내기도 함
+      data[i].bval = 0; //bval clear
+     }
+}
+==================================================== 4-state
+import "DPI-C" function void fib(output logic[31:0] data[20]);
+
+program automatic test;
+logic[31:0] data[20];
+initial begin
+    fib(data);
+    foreach(data[i]) $display(i,,data[i]);
+end
+endprogram
+
+  Openarrray 사용 시 배열 크기가 달라져도 수정 안 해도 됨
+
+  
+  import "DPI-C" function void fib_oa(output bit[31:0] data[]); // [] 사용함
+
+program automatic test;
+localparam SIZE = 20;
+bit[31:0] data[SIZE];
+
+initial begin
+    fib_oa(data);
+    foreach(data[i]) 
+    $display(i, ,data[i]);
+end
+endprogram
+
+  void fib_oa(const svOpenArrayHandle data_oa){ //svOpenArrayHandle은 open array와 관련된 정보를 담고 있는 구조체를 가리키는 핸들임
+    int i, *data;
+    data = (int*) svGetArrayPtr(data_oa); //배열의 첫 요소 주소 반환 및 int*로 접근(void* 그대로는 산술 접근 불가능)
+    data[0] = 1;
+    data[1] = 1;
+    for(i = 2; i<=svSize(data_oa, 1); i++) // 1은 차원을 나타내며 data_oa 사이즈를 반환
+    data[i] = data[i-1] + data[i-2];
+}
+
+===========================================================
+
+import "DPI-C" function void mydisplay(inout int h[][]);
+
+program automatic test;
+int a[6:1][8:3];
+initial begin
+    foreach(a[i, j])a[i][j] = i + j;
+    mydisplay(a);
+    foreach(a[i, j])
+    $display("v: a[%d][%d] = %0d", i, j, a[i][j]);
+end
+endprogram
+
+void mydisplay(const svOpenArrayHandle h){
+    int i, j;
+    int lo1 = svLow(h, 1);
+    int hi1 = svHigh(h,1);
+    int lo2 = svLow(h, 2);
+    int hi2 = svHigh(h, 2);
+    for(i = lo1; i<=hi1 ; i++){
+        for( j = lo2 ; j<=hi2; j++){
+          int *a = svGetArrElemPtr2(h, i, j); // 포인터를 반환
+            io_printf("C: a[%d][%d] = %0d", i, j, *a);
+            *a = i*j;
+        }
+    }
+}
+          packed open array도 전달 가능하나 packed 차원을 합친 사이즈가 형신인자의 단일 요소와 사이즈가 같아야 함 
+          => bit [63:0]가 import문에 있을 때 sv에서 bit[1:0][0:3][6:-1] 사용 가능 2*4*8 = 64이므로
+            

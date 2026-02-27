@@ -1,0 +1,61 @@
+1. using analysis ports in a testbench
+커맨드 모니터와 리서트 모니터를 생성한 후 bfm 핸들이 이들을 가리키게 만들었음
+
+모니터들에서 각각 커버리지 클래스, 스코어보드 클래스로 보낼 값을 보내는 write_to_monitor 메서드를 사용해서 보내고 이 내부에서 write()를 호출했음
+커맨드 모니터의 경우 두 개의 값과 연산자를 받아서 커맨드 구조체 생성후 write에 인자로 넣어줌
+uvm_config_db :: get은 모니터에서 해주고 observer 패턴 이용함
+
+스코어보드의 경우 결과, 명령어 두 가지가 필요했기에 내부에 uvm_tlm_analysis_fifo를 이용했음 이 후 write 메서드에서 get_try 이용
+또한 패키지에 두 모니터의 핸들 선언 후 build 페이즈에서 this로 넘겨줌
+
+put_port, get_port, uvm_tlm_analysis_fifo(cmd_f)를 이용함
+연결의 경우  connect 해줌
+result_monitor_h.ap.connect(scoreboard_h.analysis_export)
+command_monitor_h.ap.connect(scoreboard_h.cmd_f.analysis_export)
+command_monitor_h.ap.connect(coverage_h.analysis_export) 사용
+
+2. interthread communication
+동기화 구현을 위해 
+producer 에서 uvm_put_port #(int) put_port_h 를 사용하고
+consumer에서 uvm_get_port #(int) get_port_h 사용
+test에서 uvm_tlm_fifo #(int) fifo_h를 사용했으며 
+fifo에 연결하기 위해 
+producer_h.put_port_h.connect(test.fifo_h.put_export) uvm_tlm_fifo가 put_export 객체, get_export 객체를 가짐
+consumer_h.get_port_h.connect(test.fifo_h.get_export) 
+사용
+fifo의 경우 요소를 타입에 관계없이(지정한 거로) 한 개만 저장 가능하므로 동기화를 위해 put, get만 사용해도 됨
+put_port_h(value)  get_port_h(value) 사용
+
+get_try, put_try의 경우 값을 가져왔는지 안 가져왔는지에 따라 값을 반환함
+
+get, put의 경우 시간이 개입하지 않으면 문제가 없으나 그렇지 않다면...(추가 내용 확인)
+
+
+3. put and get ports in Action
+random_tester와 driver를 구분했음
+base_tester에서 값, 연산자 랜덤으로 얻고 command 구조체에 저장 후 위에서와 마찬가지로 put_port 사용 후 put
+driver의 경우 get_port 사용 후 get
+이 경우 연결은 env에서 uvm_tlm_fifo 사용해서 
+
+4 .UVM_reporting
+$display를 사용할 경우 테스트 횟수가 많아지면 출력 되는게 너무 많아짐
+uvm은 리포트 매크로를 제공함
+심각도가 낮은 순으로 나열하면
+`uvm_info (<Message ID string>, <message string>  <verbosity>) 여기만 verbosity 설정
+`uvm_wanring (<Message ID string>, <message string>)
+`uvm_error  (<Message ID string>, <message string>)
+`uvm_fatal  (<Message ID string>, <message string>) 임
+
+message string은 출력할 메시지
+ID는 scoreboard 같은 메세지의 타입 식별 
+verbosity는 상세 수준
+
+verbosity 레벨 보다 낮으면 출력됨 기본은 UVM_MEDIUM
+UVM_NONE, UVM_LOW, UVM_MEDIUM, UVM_HIGH, UVM_FULL, UVM_DEBUG 가 있음
+전체적으로 설정하거나 특정 부분만 설정도 가능
++UVM_VERBOSITY = ~~ 전체 설정 시뮬레이터 커맨드 라인에
+일부만 => end_of_elaboration 페이즈 이용 scoreboard_h.set_report_verbosity_level_hier(~~) hier 있으면 scb포함 하위 계층 전부 빼면 scb만
+
+심각도에 따라 유발되는 행위도 변경 가능
+UVM_NO_ACTION, UVM_DISPLAY, UVM_LOG, UVM_COUNT, UVM_EXIT, UVM_CALL_HOOK, UVM_STOP 등이 있음
+scoreboard_h.set_report_severity_action_hier(UVM_ERROR, ~~) 형식

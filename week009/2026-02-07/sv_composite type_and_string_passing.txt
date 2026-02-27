@@ -1,0 +1,75 @@
+sv와 C의 클래스 프로퍼티의 레이아웃은 서로 다르다 -> 객체를 직접적으로 공유 불가능 => 각각 비슷한 구조체 + 두 형식 사이 전환을 위한 pack, unpack 메서드 생성
+typedef struct{
+  unsigned char r, g, b; //little-endian이면 순서 b,g,r로 수정(sv는 big-endian을 사용하므로)
+}*p_rgb; // inout으로 사용할거면 *사용 해야함 아니면 값을 받아서 수정해주지는 못함
+
+void invert(p_rgb rgb){ 
+    rgb->r = ~rgb->r;
+    rgb->g = ~rgb->g;
+    rgb->b = ~rgb->b;
+    io_printf("C: Invert rgb = %02x, %02x, %02x\n",
+              rgb->r, rgb->g, rgb->b);
+}
+
+typedef struct packed {bit[7:0] r, g, b} RGB_T; // DPI-C가 packed values의 정규 표현 방식을 가지므로 packed 사용
+import "DPI-C" function void invert(inout RGB_T pstruct);
+
+program automatic test;
+class RGB;
+rang bit[7:0] r,g,b;
+
+function void display(input string prefix=" ");
+$display("%sRGB=%x,%x,%x",prefix, r, g, b);
+endfunction
+
+function RGB_T pack();
+pack.r = r; pack.g = g, pack.b = b;
+endfunction
+
+function void unpack(input RGB_T pstruct);
+r = pstruct.r; g = pstruct.g; b=pstruct.b;
+endfunction
+endclass
+
+initial begin
+    RGB pixel;
+    RGB_T pstruct;
+
+    pixel=new;
+    repeat(5) begin
+        'SV_RAND_CHECK(pixel.randomize());
+        pixel.display("SV: before ");
+        pstruct = pixel.pack();
+        invert(pstruct);
+        pixel.unpack(pstruct);
+        pixel.display("SV: after ");
+    end
+end
+endprogram
+
+
+=============================
+문자열 전달 방법 
+char* print(p_rgb rgb){ // 문제점 : 동시 호출 시 저장공간 공유 가능함
+    static char s[12]; // 스택 영역에 저장되므로 함수가 종료되도 그대로 유지되게 static 사용
+    sprintf(s,"%02x,%02x,%02x",rgb->r,rgb->g,rgb->b); // sprintf 는 버퍼 크기를 확인하지 않으므로 주의
+    return s;
+} 
+
+
+#define PRINT_SIZE 12
+#define MAX_CALLS 16
+#define HEAP_SIZE PRINT_SIZE * MAX_CALLS
+
+char* print(p_rhb rgb){
+  static char print_heap[HEAP_SIZE + PRINT_SIZE]; // null까지 고려해 공간 설정
+    char* s;
+    static int heap_idx = 0;
+    int nchars;
+  s = &print_heap[heap_idx]; // 이 인덱스부터의 주소를 가리킴
+    nchars = sprintf(s,"%02x,%02x,%02x",rgb->r,rgb->g,rgb->b); // null 문자를 제외한 문자열의 길이 저장
+    heap_idx += nchar + 1;
+    if(heap_idx > HEAP_SIZE)
+    heap_idx = 0;
+    return s;
+}

@@ -1,0 +1,23 @@
+|->는 앞 이벤트가 발생하면, 바로 뒤 이벤트를 만족해야 함을 의미
+sequence A;
+    a ##1 b;
+endsequence
+
+assert property (A |-> c);
+
+왼쪽: 조건/시퀀스 (trigger)
+|->: “발생하면 →”
+오른쪽: 조건/시퀀스가 발생해야 함
+
+PSLVERR가 있는 쓰기/읽기 전송에서
+            데이터 생성        샘플링 주체       언제 읽히는지      그래서
+쓰기       master                 slave                slave가 앎          읽기 데이터 짧게 유지 가능
+
+읽기         slave                  master               slave가 모름     데이터 오래 유지 필요
+
+PREADY가 1일때 샘플링
+master가 클럭 기준으로 샘플링하므로 slave는 샘플링 타이밍을 모르므로 데이터 오래 유지해야 함
+
+PSLVERR 매핑
+AXI에서 APB로 브릿지 시 PSLVERR가 발생한 APB에러는 쓰기의 경우 BRESP  읽기의 경우 RRESP으로 매핑
+AHB에서 APB로 브릿지 시 PSLVERR가 발생한 APB에러는 읽기 쓰기 모두에서 HRESP로 매핑됨

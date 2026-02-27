@@ -1,0 +1,111 @@
+
+typedef struct god {
+	string name;
+	string mythology;
+	string vehicle;
+	string weapon;
+
+	god(const string& n,
+		const string& m = "nothing",
+		const string& v = "nothing",
+		const string& w = "nothing")
+		: name(n), mythology(m), vehicle(v), weapon(w) {
+	}
+
+};
+
+class Link {
+public:
+	god value;
+	Link(const string& n, const string& myth, const string& vehi, const string& weap )
+		:value(n, myth, vehi, weap){ }
+	Link(const string& n, Link* p, Link* s)
+		:value(n), prev{p}, succ{s} { } // 구조체의 생성자를 구조체에 둬서 더 간편하게 가능함
+
+	Link* insert(Link* n); // 이 객체 이전에 n 삽입
+	Link* add(Link* n); //이 객체 다음에 n 삽입
+	Link* erase(); //리스트에서 이 객체 삭제
+	Link* find(const string& s); //리스트에서 s 찾기
+	//const Link* find(const string& s) const; // const 리스트에서 s 찾기
+	Link* advance(int n) const; //리스트에서 n번 이동
+	Link* next() const { return succ; }
+	Link* previous() const { return prev; }
+	void print_all() const;
+
+private:
+	Link* prev = nullptr;
+	Link* succ = nullptr;
+};
+
+Link* Link::insert(Link* n) {
+	if (n == nullptr) return this;
+	if (this == nullptr) return n;
+	n->succ = this;
+	if (prev) prev->succ = n;
+	prev = n;
+	return n;
+}
+
+
+Link* Link::add(Link* n) {
+	if (n == nullptr) return this;
+	if (this == nullptr) return n;
+	n->prev = this;
+	n->succ = succ;
+	if (succ) succ->prev = n;
+	succ = n;
+	return n;
+}
+
+Link* Link::erase() {
+	if (this == nullptr) return nullptr;
+	if (succ) succ->prev = prev;
+	if (prev) prev->succ = succ;
+	return succ;
+}
+Link* Link::find(const string& s) {
+	Link* p = this;
+	while (p) {
+		if (p->value.name == s) return p;
+		p = p->succ;
+	}
+	return nullptr;
+}
+
+/*
+Link* Link::find(const string& s) {
+	while (this) {
+		if (value.name == s) return this;
+		this = succ; //오류 this는 수정할 수 없는 포인터 
+	}
+	return nullptr;
+}
+*/
+
+Link* Link::advance(int n) const {
+	const Link* p = this;
+	if (p == nullptr) return nullptr;
+	if (n > 0) {
+		while (n--) {
+			if (p->succ == nullptr) return nullptr;
+			p = p->succ;
+		}
+	}
+	else if (n < 0) {
+		while (n++) {
+			if (p->prev == nullptr) return nullptr;
+			p = p->prev;
+		}
+	}
+	return const_cast<Link*>(p); // const를 Link*로 캐스트해서 출력
+}
+
+void Link::print_all() const {
+	const Link* p = this;
+
+	while (p) {
+		cout << "name: " << p->value.name << "   " << "mythology: " << p->value.mythology << "   " <<
+			"vehicle: " << p->value.vehicle << "   " << "weapon: " << p->value.weapon << "\n";
+		p = p->succ;
+	}
+} 

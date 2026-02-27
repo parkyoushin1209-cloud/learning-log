@@ -1,0 +1,144 @@
+#include <svdpi.h>
+#include <stdio.h>
+extern void mem_build(int);
+
+void read_file(char* fname){
+    char cmd;
+    FILE *file;
+
+    file = fopen(fname, "r");
+    while(!feof(file)){
+        cmd  = fgetc(file);
+        switch(cmd){
+            case 'M':{
+            int hi;
+            fscanf(file, "%d", &hi);
+              mem_build(hi); // c자체 배열의 메모리 사이즈가 정해지는 것은 아님 단순히 c에서 결정한 정보를 sv에 반영하기 위한 것
+            break;
+            }
+        }
+    }
+    fclose(file);
+}
+====================================================
+module memory;
+  import "DPI-C" context function void read_file(string fname); //c에서 이 함수가 sv의 exported 함수를 사용한다면 context 사용
+  export "DPI-C" function mem_build; // 인자 리스트가 없음(LRM상 반환값의 타입을 두거나 인자 리스트를 둘 수 없음)
+
+initial read_file("mem.dat");
+
+int mem[];
+
+  function void mem_build(input int size); //export 선언 내 정보는 모듈 끌테서 이 정보를 복사할 것임 => 도중에 함수를 바꾼다면 동기화가 어긋날 수도 있음
+mem = new[size];
+endfunction
+
+endmodule : memory
+
+
+============================
+//sv
+module memory; //실제 메모리는 쓰기와 읽기에 시간을 소모할 수도 있음 태스크 사용
+import "DPI-C" context task read_file(string fname);
+export "DPR-C" task mem_read;
+export "DPI-C" task mem_write;
+export "DPI-C" function mem_build;
+
+read_file("mem.dat");
+
+class Memory;
+int mem[];
+
+function new(input int size);
+mem = new[size];
+endfunction
+
+task mem_read(input int addr, output int data);
+#20 data = mem[addr];
+endtask
+
+task mem_write(input int addr, input int data);
+#10 mem[addr] = data;
+endtask
+endclass
+
+Memory memq[$];
+
+function void mem_build(input int size);
+Memory m;
+m = new(size);
+memq.push_back(m);
+endfunction
+
+  task mem_read(input idx, input int addr, output int data); // c에서 클래스 내부 메서드는 접근 불가 핸들의 배열 및 인덱스 이용
+memq[idx].mem_read(addr, data);
+endtask
+
+task mem_write(input int idx, input int addr, input int data);
+memq[idx].mem_write(addr, data);
+endtask
+endmodule
+
+extern void mem_build(int);
+extern int mem_read(int, int, int*); //sv 아웃풋은 *로 태스크는 int로 선언됐음 vcs의 경우 보내진 태스크를 c에서 void로 함
+extern int mem_write(int, int, int);
+
+void read_file(const char* fname){
+    int idx;
+    FILE *file;
+    char cmd;
+
+    file = fopen(fname, "r");
+    while(!feof(file)){
+        cmd = fgetc(file);
+        fscanf(file, "%d", idx);
+        switch(cmd){
+            case 'M':{
+                int hi;
+                fscanf(file,"%d", &hi); //&를 사용해야 값을 변경할 수 있음(참조에 의한 호출) => 안 사용하면 함수에서는 바껴도 외부에서는 적용 안 됨
+                mem_build(hi);
+                break;
+            }
+            case 'R':{
+                int addr, data, exp;
+                fscanf(file, "%d %d",&addr, &exp);
+                mem_read(idx, addr, &data); // int로 정의하고 &사용해도 문제 없음
+                if(data == exp)
+                ioprinf("C: Data=%d, exp=%d\n",data, exp);
+                break;
+            }
+            case 'W':{
+                int addr, data;
+                fscanf(file, "%d %d", addr, data);
+                mem_write(idx, addr, data);
+                break;
+            }
+        }
+    }
+    fclose(file);
+}
+
+
+===========================
+extern void sv_display();
+svSocpe my_scope;
+
+void save_my_scope(){ // 현재 스코프에 대한 핸들 얻기
+    my_scope = svGetScope();
+}
+
+void c_display(){
+    io_printf("\nC: c_display called from scope %s\n", svGetNameFromScope(svGetScope())); // scope를 통해 이름 얻고
+
+    svSetScope(my_scope); // 스코프 설정
+    io_printf("C: calling %s.sv_display\n", svGetNameFromScope(svGetScope())); // 이 scope에서 sv_display 호출됨
+    sv_display();
+}
+
+// 모듈 top.b1에서 save_my_scope 후 top에서 c_display 실행 시 b1의 sv_display가 실행됨
+
+
+context의 의미
+              -가져온 루틴의 문맥은 그것이 선언된 장소임(module, program 등등이 될 수 있음)
+                -한 루틴을 서로 다른 범위에서 가져온 경우 c코드는 import문이 발생한 곳의 문맥에서 실행됨(하위 모듈을 파생해 함수 사용 시 하위 모듈이 문맥임
+              -문맥을 따로 설정해 다른 문맥에 있는 루틴을 호출하는 것도 가능함
