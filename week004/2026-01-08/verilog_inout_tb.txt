@@ -1,0 +1,22 @@
+module bus_switch(bus,bus_a,bus_b,control);
+inout [3:0]bus, bus_a, bus_b;
+input control;
+
+tranif1 (bus, bus_a, control);
+tranif0 (bus, bus_b, control);
+
+endmodule;
+
+module stimulus;
+reg [3:0] a, b;     //inout이면 wire로 쓰는게 맞지만 값 변경을 위해 reg사용
+  wire [3:0] bus;      
+  reg control;
+
+  bus_switch UUT (
+    .bus(bus),
+    .bus_a(a),
+    .bus_b(b),
+    .control(control)
+  );
+
+endmodule;

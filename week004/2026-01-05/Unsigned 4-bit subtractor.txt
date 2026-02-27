@@ -1,0 +1,55 @@
+module full_adder(s,c_out,x,y,c_in);
+output s,c_out;
+input x,y,c_in;
+
+wire p, g, t;
+xor (p,x,y);
+and (g,x,y);
+xor (s,p,c_in);
+and (t,p,c_in);
+or (c_out,t,g);
+
+endmodule;
+
+module add_sub_4bit(s,c_out,x,y,c_in);
+output c_out;
+output [3:0] s;
+input [3:0] x, y;
+input c_in;
+
+wire [3:0] y_xor;
+
+xor (y_xor[0], y[0], c_in);
+xor (y_xor[1], y[1], c_in);
+xor (y_xor[2], y[2], c_in);
+xor (y_xor[3], y[3], c_in);
+
+wire c0,c1,c2;
+
+full_adder fa0(s[0],c0,x[0],y_xor[0],c_in);
+full_adder fa1(s[1],c1,x[1],y_xor[1],c0);
+full_adder fa2(s[2],c2,x[2],y_xor[2],c1);
+full_adder fa3(s[3],c_out,x[3],y_xor[3],c2);
+
+endmodule;
+
+module stimulus;
+reg [3:0] A,B;
+reg C_IN;
+wire C_OUT;
+wire [3:0]SUM;
+
+add_sub_4bit m(SUM,C_OUT,A, B, C_IN);
+
+initial begin
+    $monitor($time," A:%b B:%b C_IN:%b SUM:%b C_OUT:%b", A[3:0], B[3:0], C_IN, SUM[3:0], C_OUT);
+end
+
+initial begin
+A <= 4'b0011; B <= 4'b1100; C_IN <= 0;
+#5 A <= 4'b0010; B <= 4'b1010; C_IN <= 0;
+#5 A <= 4'b0010; B <= 4'b1010; C_IN <= 1;
+#5 A <= 4'b0011; B <= 4'b1100; C_IN <= 1;
+#10 $finish;
+end
+endmodule;
