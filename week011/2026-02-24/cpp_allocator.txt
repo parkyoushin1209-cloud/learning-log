@@ -1,0 +1,37 @@
+allocator(할당자) : 컨테이너가 메모리를 할당하고 해제하는 방식을 제어하는 객체
+표준 라이브러리 컨테이너(ex. vector, list, map)는 내부적으로 메모리를 직접 new/delete하지 않고 allocator를 통해 관리함
+
+<memory>에 있으며
+기본적으로 
+operator new를 사용해 메모리 할당
+operator delete을 사용해 메모리 해제
+객체 생성/소멸을 분리해서 처리 = 메모리 확보, 객체 생성은 별개의 단계
+
+allocator<int> alloc;
+ // 1. 메모리만 할당 (객체 생성 X)
+    int* p = alloc.allocate(3); // 포인터를 반환함
+
+    // 2. 객체 생성
+    for (int i = 0; i < 3; ++i) {
+        alloc.construct(&p[i], i * 10);
+    }
+
+    // 사용
+    for (int i = 0; i < 3; ++i)
+        std::cout << p[i] << " ";
+
+    // 3. 객체 소멸
+    for (int i = 0; i < 3; ++i)
+        alloc.destroy(&p[i]);
+
+    // 4. 메모리 해제
+    alloc.deallocate(p, 3);
+}
+
+필요한 이유
+1. 메모리 관리 전략 변경 가능
+-풀 메모리, 공유 메모리, GPU메모리, 메모리 추적/디버깅
+2. 성능 최적화
+-작은 객체 전용 메모리 풀
+-fragmentation 감소
+- cache 친화적 설계

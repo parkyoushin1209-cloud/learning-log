@@ -1,0 +1,94 @@
+c++
+template<typename T> // 템플릿 뛰어난 유연성과 최적에 가까운 성능을 지니나 유연성, 성능을 얻고자 템플릿 내부(정의)와 템플릿 인터페이스(선언) 사이 명확한 구분을 희생함
+class VECTOR {
+	int sz; //크기
+	T* elem;//요소를 가리키는 포인터(또는 0)
+	int space; // 요소의 개수 더하기 남아있는 슬롯의 개수
+public:
+
+void VECTOR::reserve(int newalloc) {  //추가적인 메모리 공간 남겨둠
+	if (newalloc <= sz) return;    // 충분히 저장 가능하면 아무것도 안 함
+	double* p = new double[newalloc];
+	for (int i = 0; i < sz; i++) p[i] = elem[i];  /sz<= <newalloc 은 초기화 안 함  
+	delete[] elem;
+	elem = p;  // 덮어씌우기 
+	space = newalloc;
+}
+
+void VECTOR::resize(int newsize) {
+	reserve(newsize);   
+	for (int i = sz; i < newsize; i++) elem[i] = 0;   남은 공간 0으로 초기화
+	sz = newsize;
+}
+
+void VECTOR::push_back(double d) {
+	if (space == 0) reserve(8); // 처음에는 8칸 더 예약
+	else if (sz == space) {  // space가 전부 차면 공간 더 줌
+		reserve(2 * space);
+		elem[sz] = d;
+		++sz;
+	}
+}
+
+
+	 VECTOR& VECTOR::operator=(const VECTOR& a) {
+		 if (this == &a) return *this;
+		 if (a.sz <= space) {
+			 for (int i = 0; i < a.sz; i++) elem[i] = a.elem[i];
+			 sz = a.sz;
+			 return *this;
+		 }
+		 double* p = new double[a.sz];
+		 for (int i = 0; i < a.sz; i++) p[i] = a.elem[i];
+		 delete[] elem;
+		 space = sz = a.sz;
+		 elem = p;
+		 return *this;
+	 }
+
+템플릿 : 요소의 타입을 자유롭게하기 위해 프로그래머로 하여금 타입을 클래스나 함수의 매개변수로 사용할 수 있게 만드는 메커니즘
+
+제네릭 프로그래밍(알고리즘 지향 프로그래밍): 템플릿 기반, 컴파일 시간에 타입 결정(좀 더 규칙적, 이해 쉬움, 더 나은 성능) => 매개변수 기반 다형성
+객체 지향 프로그래밍: 클래스 계층 구조, 가상 함수 바탕, 실행시간에 호출할 함수 결정(더 나은 자유도) => 임시적 다형성
+
+템플릿은 상속의 이점을 암묵적으로 물려받지 못함
+
+콘셉트 : 템플릿 인자가 만족해야할 요구 사항의 집합
+
+
+	template<typename T, int N> struct array {
+		T elem[N];
+		// 기본 생성자와 소멸자, 대입 연산 사용
+		T& operator[](int n);
+		const T& operator[](int n)const;
+		T* data() { return elem; }
+		const T* data() const { return elem; }
+
+		int size() const {
+			return N;
+		}
+	};
+	const int max = 1024;
+	void fct(int n) {
+		array<char, max> loc;
+		array<char, n>oops; // 컴파일 시점에 n 값을 모르므로 오류***
+	} // 반대로 컴파일 시점에 크기를 알 수 있으므로 스택/정적 메모리에 할당 가능함
+
+	array<double, 6>ad = { 0.0, 1.1, 2.2, 3.3, 4.4, 5.5, 6.6 };
+	double* p = ad; // 오류: array는 배열과 달리 암묵적으로 포인터로 변환 불가
+	double* q = ad.data(); // 명시적 변화은 가능
+
+	template<typename C> void printout(const C& c) { // 함수 템플릿
+		for (int i = 0; i < c.size(); ++i) cout << c[i] << '\n'; // array, vector를 인자로 받을 수 있음 => size() 함수가 동일하므로***
+	}
+
+	array<char, 1024> buf;
+	array<double, 10> b2;
+	template<class T, int N>void fill(array<T, N>& b, const T& val) {
+		for (int i = 0; i < N; i++) b[i] = val;
+	}
+	
+	void f() {
+		fill(buf, 'x'); // 가능 buf의 타입을 통해 연역해서 알아낼 수 있음***
+		fill(b2, 0.0);
+	}

@@ -1,0 +1,85 @@
+virtual interface를 쓰는 진짜 이유 4가지
+① 클래스는 static 객체에 직접 접근 불가
+
+→ 반드시 핸들 전달 필요
+
+② 재사용성 증가
+
+같은 UVC를 다른 DUT에 재사용 가능
+
+③ multi-instance 지원
+
+동일 UVC 여러 개 사용 가능
+
+apb_if_0 → apb_agent_0
+apb_if_1 → apb_agent_1
+④ 계층적 독립성 유지
+
+UVC 내부에서 DUT 경로 몰라도 됨
+
+
+Simulation Kernel (dynamic, class 영역)
+ └── run_test("my_system_test")  ──> my_test (UVM Test)
+      ├── env (UVM Environment)
+      │     ├── APB UVC (Agent)
+      │     │     ├── Sequencer
+      │     │     ├── Driver
+      │     │     └── Monitor
+      │     │           └── virtual apb_if vif  ← UVC Interface
+      │     ├── AXI UVC (Agent)
+      │     │     ├── Sequencer
+      │     │     ├── Driver
+      │     │     └── Monitor
+      │     │           └── virtual axi_if vif  ← UVC Interface
+      │     └── Virtual Sequencer
+      │           └── cross-interface orchestration
+      └── Virtual Sequences / Scenarios
+           └── connected to Virtual Sequencer
+
+Top Module (static, RTL 영역)
+ ├── DUT
+ └── Interfaces
+       ├── apb_if apb_if_inst  ← System Interface
+       └── axi_if axi_if_inst  ← System Interface
+
+
+
+
+==============================================
+                 Test
+                   ↓
+            Virtual Sequence
+                   ↓
+            Virtual Sequencer
+              /            \
+             /              \
+        AXI UVC            APB UVC
+      (agent)              (agent)
+        ↓   ↓               ↓   ↓
+     seqr  drv            seqr  drv
+        ↓                    ↓
+       DUT  <----------------->
+        ↑                    ↑
+      monitor              monitor
+           \              /
+            \            /
+               Scoreboard
+
+-interface UVC(Agent)
+각 인터페이스별로 존재
+Agent - sequencer, driver, monitor
+
+-virtual sequencer(system level)
+여러 UVC의 시퀀서를 동시에 제어
+cross-interface 시나리오 생성
+실제 신호는 모름
+orchestration 역할
+
+-virtual sequence
+system-level 시나리오 기술
+여러 시퀀서에 트랜잭션 발행
+
+-system scoreboard
+여러 인터페이스에서 들어오는 트랜잭션을 종합 비교
+end-to-end 검증 수행(입력부터 최종 출력까지 전체 경로를 통합적으로 검증)
+타이밍에 의존하지 않는 참조 모델

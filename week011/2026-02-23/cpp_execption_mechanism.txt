@@ -1,0 +1,54 @@
+c++ 예외 메커니즘
+
+기본 예외 흐름 : funB에서 예외 발생 -> 호출 스택을 타고 funA로 전파 -> main의 try-catch에서 잡힘, 중간에서 잡지 않고 그냥 호출 스택으로 전파하면 호출자에게 실패를 알릴 수 있음
+
+#include <iostream>
+#include <stdexcept>
+
+void funcB() {
+    throw std::runtime_error("B failed");
+}
+
+void funcA() {
+    funcB();  // 여기서 예외 발생
+}
+
+int main() {
+    try {
+        funcA();
+    } catch (const std::exception& e) {
+        std::cout << "Caught: " << e.what() << "\n";
+    }
+}
+
+중간에서 잡고 다시 던지기
+catch에서 메시지 로깅 등 처리 후 throw;만 쓰면 원래 예외를 그대로 재전파
+주의: throw e라고 쓰면 복사본이 만들어져 타입 슬라이싱 문제 발생 가능(타입 슬라이싱(Type slicing)은 파생 클래스 객체를 기본 클래스 타입으로 복사하거나 할당할 때, 파생 클래스 고유 멤버가 잘려서 사라지는 현상)
+원래 예외 객체 유지하려면 throw; 사용
+
+void funcA() {
+    try {
+        funcB();
+    } catch (const std::exception& e) {
+        std::cout << "Logging in A: " << e.what() << "\n";
+        throw;  // 다시 던짐 (rethrow)
+    }
+}
+
+스택 언와이딩(stack unwinding) : 예외 발생 시 호출 스택을 역순으로 거슬러 올라가며 지역 객체의 소멸자를 호출하고 함수 스코프를 종료하는 과정
+예외가 발생하면 현재 함수 스코프를 종료하면서 지역 변수의 소멸자가 호출됨 -> RAII
+재던지기 throw;도 같은 스택 언와이딩 과정 반복
+결국 최종적으로 잡히는 catch까지 전파됨
+FunB() throws -> funA() catcj -> throw -> main() catch
+
+중요한 포인트
+1. throw; vs throw e;
+throw; → 기존 exception object 그대로 재전파
+throw e; → 새로 복사된 exception object를 던짐 → slicing 위험
+
+2. RAII와 예외 안전
+스택 언와인딩으로 지역 객체 소멸자 호출됨
+자동으로 메모리/자원 해제 → 예외 안전
+
+3. 예외 전파 체인
+중간 함수에서 잡고 로그 처리 후 재던지면 호출자에게 실패 신호 전달 가능

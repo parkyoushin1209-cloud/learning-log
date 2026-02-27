@@ -1,0 +1,125 @@
+성공적 attempt로 시작된 뒤 결과 획득 가능
+success
+어써션 프로퍼티 조건이 지켜질 때 성공
+공허 또는 공허하지 않게 성공 가능
+어써션 스레드의 성공이 필수적으로 시도의 성공적 종료를 나타내지는 않음(어써션 성공/패스 선언을 위해 모든 스레드가 실행될 필요가 있을 수도 있음)
+프로퍼티는 accept_on 연산자의 조건이 참일 경우 공허하게 성공할 수 있으며 이때 성공/패스 카운트에 집계 안됨
+
+failure
+어써션 프로퍼티 조건이 지켜지지 않을 때 실패
+reject_on 연산자 조건이 참일 때 실패
+
+disabled
+disable iff 조건이 참일 때 비동기적으로 종료될 수 있음
+
+kiiled
+시스템 함수 $assertkill로 중단 될 수 있음
+죽은 어써션은 통계에 기여 안 함
+
+sequence qAB2C;
+$rose(a) ##1 b ##2 c;
+endsequence : qAB2C
+
+ap_qAB2C : assert property(@(posedge clk) qAB2C);
+/*
+모든 상승에지에서 클럭킹 이벤트 발생, 새 시도 시작
+$rose(a)에 함축 연산자가 없으므로 a가 1이 아니면 실패임 ***
+
+a성공 시 다음 사이클에서 b확인 후 0이면 실패 아니면
+다음 사이클로 진행계속 됨
+
+##2 는 #1 1'b1 ##1과 동치이므로 다음 사이클은 성공 그 다음 사이클에 c확인
+*/
+
+property p_handshake;
+requese |=> acknowledge ##1 data_enable ##1 done;
+endproperty
+
+ap_handshake : assert property(@(posdege clk) p_handshake)
+/*
+request는 선행조건 함축 연산자가 있으므로 0이면 공허한 성공
+|-> 같은 사이클에서 이어저야함
+|=> 다음 사이클에서 이어짐 ***
+
+단지 시퀀스인 프로퍼티의 어써션은 드물게 사용됨 (오버랩 문제로 인해 예상치 못한 에러 발생 가능함)
+=> 이를 방지하기 이해 시퀀스들은 프로퍼티에서 함축 연산자와 함께 사용됨
+
+시퀀스는 cover sequence, cover property와 함께 기능적 커버리지를 위해 사용됨
+*/
+
+
+어써션 타입에는 immediate assertion, concurrent assertion이 있음
+
+즉각적 어써션의 경우 :  간단한 즉각적 어써션과 지연된 즉각적 어써션으로 나뉘며
+간단한 즉각적 어써션의 경우 reporting은 평가에서 바로 진행 **
+지연된 어써션의 경우 그 타입 스텝의 이후로 밀리므로 순간적인/ 글리치 값에 대해 어느 정도 보호를 제공함
+
+동시적 어써션은 클럭 동기화에 기반해, 디자인 변수의 샘플된 값을 사용함 **
+여러 시간에 걸친 행위를 설명함
+평가 모델은 클럭 기반
+절차적 블록 내에서 쓰이거나 분리된 문장으로 표현 가능
+
+동시적 어써션은 다음에서 명시 가능
+always, always_ff 같은 절차 또는 initial 절차문 내부
+module, interface, program, generate block, checker 내부
+
+테스크 또는 클래스 내부에서는 안 됨 **
+final 절차에서는 사용 안 함, final은 시뮬레이션 시간의 마지막에 시간 요소 없이 진행되기 때문임(final은 결과 보고할 때 주로 이용함)
+
+어써션문은 프로퍼티에서 수행될 검증기능을 진술하며 문장으로 다음의 것이 가능 ***
+1. assert property : 프로퍼티가 설계를 위해 지켜지도록 보장
+2. assume property : 환경에 대한 가정 명시
+3. cover property : 커버리지 시도에 대해 프로퍼티의 평가를 모니터
+4. cover sequence : 커버리지에 대한 시퀀스의 모든 스레드를 모니터함
+5. restrict property : 형식 검증에서 특정 구역에 집중하기 용이하게 하기 위해 형식 검증 제약 지시어로 사용함
+시뮬레이터는 이런 프로퍼티를 검사하지 않으며 assume property와 같은 의미로 해석함
+restrict 어써션문은 없음
+
+property p_handshake;
+$rose(req) |-> ##[0:4] ack ##1 !ack; // ack은 0~4사이클 안에 최소 한 사이클 이상에서만 참이면 됨
+endproperty : p_handshake // 절차적 블록 외부에 프로퍼티 선언
+
+always_ff @(posedge clk) begin : handshake_block
+if(ready)
+ap_handshake : assert property (disable iff(!reset_n) p_handshake); // 절차적 블록에서 인스턴스화 가능
+end
+
+시스템 베릴로그에서 인터페이스 구성은 
+블록 사이 통신을 캡슐화해 추상적 시스템 수준 설계에서 점진적인 세부화를 거쳐 낮은 수준 레지스터 전송 및 구조적 설계 뷰까지 원활하게 이전 가능하도록 특별히 생성됨, 디자인 재사용에도 좋음
+UVM,VMM에서 필수적임(테스트 벡터가 DUT에 적용될 수 있도록 함)
+
+인터페이스에 있는 어써션은 인터페이스에 대한 프로퍼티 문서화뿐만 아니라 상호 블록 연결에 대한 에러도 잡을 수 있음
+인터페이스 내부 어써션의 행위 블록은 프레임워크의 동작에도 영향을 미칠 수 있음(인터페이스 변수의 값을 변경해서)
+동시적 어써션은 클래스 안에서 불법이지만 클래스 변수는 동시적 어써션이 합법인 인터페이스로 복사될 수 있음 **
+=> UVM 드라이버에 의해 사용되는 정보가 인터페이스 어써션으로 통합될 수 있게 해줌
+
+사이클 지연
+simple delay ##n  /  delay range ##[n:m]     /  open-ended  ##[1:$]  1이상
+
+반복
+fixed [*n]    /   empty word [*0]   / range  [*n:m]    /  open-ended  [*n:$]   [*]=[*0:$]    [+] = [*1:$]  / non_consecutive   [=n]   /  goto_repetition [->n]
+
+시퀀스 연산자
+and        /   intersect    /  or   /throughout    /     within     SEQ within  SEQ  /    first_match     first_match(SEQ)
+
+엔드 포인트
+-matched(멀티 클럭 시퀀스의)       SEQ_Name.matched  /      -triggered(단일 클럭 시퀀스의)     SEQ_Name.triggered
+
+샘플된 값 함수
+$sampled(expr)         /      $rose(expr[,clk_evnt])       /  $fell(expr[,clk_evnt])   / $stable(expr[,clk_evnt])         /  $changed(expr [,[clk_evnt]])         /  $past(expr[,number_of_ticks]  [,expr2] [,clk_evnt])
+
+벡터 분석 시스템 함수
+$counterbits(expr, 조작 비트 {, 조작비트}) // 조작 비트를 가지는 모든 수 카운트
+$countones(expr)   // 벡터에 1 개수 카운트
+$onehot(expr)   // 한개만 1이면 참
+$onehot0(expr)   // 0개 또는 1개만 1이면 참
+$isunknown(expr)   // 벡터의 어떤 비트가 X 또는 Z면 참 $countbits(expr, 'X, 'Z)와 동등
+
+
+
+반복 연산자
+지역 변수와 함께 쓰일 때 카운트 연산도 수행 가능함
+반복 연산자 타입
+시퀀스 연속적 반복 [*n]  n번 연속으로 반복 , 시퀀스, 부울식에 모두 사용 가능
+시퀀스 비연속적 반복 [=n]  비연속적으로 n번 반복되도 되며 n번 반복 후 언제든 다음 식이 나오면 참   부울식에만 사용가능
+시퀀스 고투 반복 [->n] 비연속적으로 n번 반복되도 되며 n번 반복 후 바로 다음 사이클에 다음식이 참이면 참  부울식에만 사용 가능     
