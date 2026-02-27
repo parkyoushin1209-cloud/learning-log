@@ -1,0 +1,78 @@
+package bus_pkg;
+typedef enum logic[1:0] {IDLE = 2'b00, NONSEQ = 2'b10} htrans_e;
+endpackage
+
+import bus_pkg::* ;
+
+interface AHB(input bit HCLK);
+logic [20:0] HADDR;//address
+htrans_e HTRANS; //2'b00 == IDLE, 2'b10 = NONSEQ
+logic [7:0] HWDATA, HRDATA; //write data, read data
+logic HWRITE; //write flag: 1 = write , 0 = read
+logic [7:0] memory [int]; // 범위가 매우 크므로 associative array 사용
+
+clocking cb @(negedge HCLK);
+input HADDR, HTRANS, HWDATA, HWRITE;
+output HRDATA;
+endclocking
+
+property transaction_type;
+@(negedge HCLK)
+(HTRANS == IDLE || HTRANS == NONSEQ);
+endproperty
+
+transaction_assertion : assert property(transaction_type)
+else $error("Invalid transaction type HTRANS= %b", HTRANS);
+
+modport master(output HADDR, HTRANS, HWDATA, HRDATA, HWRITE,
+        input HCLK);
+modport slave(clocking cb);
+
+endinterface
+
+
+module AHB_DESIGN(AHB.slave asp);
+
+always @asp.cb begin
+    if(asp.HTRANS == IDLE)begin //가독성을 위해 ;이 아닌 블록 사용
+
+    end else begin
+    if(asp.HWRITE) 
+        asp.memory[asp.HADDR] <= asp.HWDATA; 
+    else 
+    asp.HRDATA <= <= asp.memory.exists(asp.HADDR) ? asp.memory[asp.HADDR] : 8'h00;// 존재하는지 확인 후 없으면 0으로
+    end
+end
+
+endmodule;
+
+program automatic AHB_TEST(AHB.master amp);
+
+  initial begin
+    amp.HADDR  <= 21'd0;
+    amp.HWDATA <= 8'hAA;
+    amp.HWRITE <= 1'b1;
+    amp.HTRANS <= NONSEQ;
+    #10;
+
+    amp.HADDR  <= 21'd1;
+    amp.HWDATA <= 8'h55;
+    amp.HWRITE <= 1'b1;
+    amp.HTRANS <= NONSEQ;
+    #10;
+
+    amp.HADDR  <= 21'd0;
+    amp.HWRITE <= 1'b0;
+    amp.HTRANS <= NONSEQ;
+    #10;
+
+    amp.HADDR  <= 21'd1;
+    amp.HWRITE <= 1'b0;
+    amp.HTRANS <= NONSEQ;
+    #10;
+
+    amp.HTRANS <= IDLE;
+    #10;
+  end
+
+endprogram

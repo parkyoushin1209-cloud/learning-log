@@ -1,0 +1,52 @@
+struct Reading {
+	int hour;
+	double temperature;
+};
+
+int main() {
+	cout << "입력 파일 입력:";
+	string iname; //입력 파일 입력 받음
+	cin >> iname;
+	ifstream ist{ iname };// iname이라는 이름의 입력 파일 열기
+	if (!ist)error("입력을 열 수 없음", iname); 
+
+	cout << "출력 파일 입력:";
+	string oname;
+	cin >> oname;
+	ofstream ost{ oname };
+	if (!ost)error("출력 파일을 열 수 없음", oname);
+
+	vector <Reading> temps;
+	int hour;
+	double temperature;
+	while (ist >> hour >> temperature) { //ist로 hour, temperature을 입력 받음
+		if (hour < 0 || hour > 23)error("시각이 구간 밖에 있음");
+		temps.push_back(Reading{ hour, temperature });
+	}
+		
+	for (int i = 0; i < temps.size(); i++)
+		ost << '(' << temps[i].hour << ','
+		<< temps[i].temperature << ")\n";
+
+}
+
+void fill_vector(istream& ist, vector<int>& v, char terminator) { //값을 입력 받아 벡터에 저장함
+	for (int i; ist >> i;) v.push_back(i); 
+//상태는 good(): 연산 성공, eof(): 입력의 끝에 다다름, fail():예상치 못한 일의 발생(숫자를 기대했는데 문자를 입력하는 등), bad(): 예상치 못한 심각한 오류 발생(디스크 읽기 오류 등)
+//상태별로 처리
+	if (ist.eof())return; //파일의 끝이면 종료
+
+	if (ist.bad())error("ist가 bad 상태"); //bad면 에러 ist.exceptions(ist.exceptions()||ios_base::badbit());를 생성 후 exceptions() 한 번 호출하면 ist를 사용하는
+  //모든 입력 루프에서 bad)무시 가능함
+	if (ist.fail()) {
+		ist.clear(); //fail() 상태에서 벗어나게 해 값을 읽게 해줌
+		char c;
+		ist >> c;
+		if (c != terminator) { // 결군 종료는 됨
+			ist.unget(); // 파일 되돌림
+			ist.clear(ios_base::failbit); //fail() 상태로 설정 종료 문자가 아닐 경우
+		}
+	}
+}
+
+ios_base는 badbit 등의 상수와 failbit() 등의 예외 등 유용한 무언가를 담고 있는 iostream의 일부로 ::로 접근 가능하다.

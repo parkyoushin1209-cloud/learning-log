@@ -1,0 +1,42 @@
+(typedef type 비트폭 정의할이름) 형식으로 정의 {정의한 이름} {변수명} 으로 사용, 변수명에 _t  suffix 붙이면 가독성 좋음
+유용한거 => typedef bit [31:0] uint; typedef int unsigned uint; //2-state, 32bit integer 많은 테스트벤치에서 signed integer값을 자주 사용하므로 혼동 방지 가능
+
+구조체
+struct {타입1 비트폭 name1, name2; 타입2 비트폭 name3;} 구조체이름 형식으로 정의하며 여러 개 사용할 거면 앞에 typedef 붙여주기 _s suffix 붙이기
+사용법 예시 mt_struct_s st = '{32'haaaa_aaaa, 8'hbb, 16'hcccc, 32'hdddd_dddd} 형식으로 초기화 가능하며 st.a, st.b등으로 참조 가능
+
+공용체(여러 변수가 같은 공간을 사용, 한 번에 하나의 값만 의미를 가짐
+typedef union {bit[31:0]b; int i;} num_u; num_u un; un.i = -1;
+
+packed structure
+typedef struct packed {bit[31:0] r,g,b} pixel_p_s 가능한 가장 작은 공간에 둠
+
+packed/unpacked structure 선택법 (보통 어디에 쓸건지와 요소의 나열을 고려해 선택)
+packed는 종합 연산을 생성하거나 홀수 사이즈 요소를 읽고 쓸 때, 추가적 이동과 마스크 연산이 필요함
+unpacked는 개별적으로 멤버 접근 시 사용
+
+패키지(모든 패키지, 프로그램, 인터페이스 사이에 선언을 공유하게 해줌)
+-import로 가져오며 공통 정의 모음이라고 볼 수 있고 name conflict를 방지할 수 있다. 계층적 참조는 불가능하다.
+package ABC; parameter~~, string~~~; endpackage  , module test; import ABC::*;fh 가져오며 일부만 가져올 경우 import xyz::변수명으로 사용, 모듈에서 패키지 내부와 같은 이름을 가지는
+변수 사용시 패키지 내의 변수는 가려짐
+
+typeconversion 비트 수가 같으면 그냥 가능하나 다르면 streaming operator사용 
+정적 cast 목표타입'(표현식=숫자, 수식 등) 형태 , 정확한 타입 사용을 원할 경우 사용
+다이나믹 cast $cast를 사용 바꾸려는 대상보다 더 큰 대상에서 변경시 사용
+
+streaming operator :할당문 오른쪽에 사용, >>, << 등이 존재 // 비트의 흐름을 변경
+
+열거형 typedeg enum {RED, GREEN, BLUE} color 형식으로 사용
+기본적으로 0,1,2 값으로 선언되지만 직접 지정도 가능 그러나 직접 지정할 경우 0값은 포함하기 color a;의 기본값은 0이므로 0이 없으면 범위 벗어남
+열거형 루틴 first(), last(), next(), next(N), prev(), prev(N)=> 요소 반환
+모든 요소 탐색할 경우 for문 말고 위의 루틴과 do while문으로 탐색
+
+상수
+verilog에서 `을 사용해 정의하면 전역 변수로 사용되 name conflict가 발생할 수 있음, parameter의 경우 모듈 범위 내이므로 범위가 좁음
+systemverilog에서는 parameter를 package내부에 선에시 여러 모듈에서 사용 가능하며 const byte colon = ":' 등의 형식도 가능함
+
+문자열
+단일문자는 byte, 문자열은 string으로 0~N-1까지며 마지막에 널 없음, 동적할당
+s1 == s2 같으면 1, 다르면 0/ s1.compare(s2) s1이 더 크면 1, 같으면 0, 작으면 -1반환
+s.getc(idx): 문자의 아스키코드 반환, s.tolower()/toupper(): 대소문자 변환, s,putc(s.len()-1,"-") 앞의 인덱스에 뒤의 문자 삽입, {}로 연결 가능, s.substr(n1,n2): n1부터 n2까지 문자 추출
+다른 루틴에 문자열이 필요할 경우 s 대신, $sformat("%s %d",s,42)등으로도 대입 가능

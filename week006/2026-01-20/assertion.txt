@@ -1,0 +1,25 @@
+디자인 내 신호에 대한 immediate assertion 생성 가능 
+문장이 실행됐을 때 표현이 참인지 확인함
+if(Arbif.cb.grant != 2'b01)
+$display("Error, grant != 2'b01)은 다음과 같이 표현 가능하다
+
+a1: assert(arbif.cb.grant == 2'b01); //올바른 값일 경우 그대로 진행, 틀린 값이면 에러 메세지를 출력함
+grants_received++; // then문장 
+else
+$error("Grant not asserted") //else문 $info, $warning, $fatal로도 출력 가능
+
+concurrent assertions는 시간적으로 계속되는 조건을 클록과 이벤트에 맞춰 지속적으로 검사하는 어써션이며 다른 디자인 블록과 비슷하게 파생되고 시뮬레이션 전체동안 활성 상태이다
+
+interface arb_if(input bot clk);
+logic [1:0] grant, request;
+bit rst;
+property request_2state; 
+@(posedge clk) disable iff(rst) //rst == 1이면 무시
+$isunknown(request) == 0; // request가 x, z가 아니면 참
+endproperty
+assert_request_2state : assert property(request_2state); //intial, always등의 절차적 블록 외부에 존재한다.
+endinterface
+
+여러 inout 포트로 구동되는 신호는 모든 드라이버의 강도, z값을 고려해 신호 값을 계산한다
+ref는 하나의 변수에 두 개의 이름을 만들어 둘 다 동일한 변수를 참조하게 한다. 1개의 저장공간
+ref ports는 신호가 아닌 변수만 연결 가능, 값을 읽고 쓸 수 있는 양방햡이며 합성에서는 지원하지 않는다.

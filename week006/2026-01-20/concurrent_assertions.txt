@@ -1,0 +1,9 @@
+interface arb_if(input bit clk); 
+logic[1:0] request, grant; 
+bit rst; 
+property request_2state; //어써션 정의 시 사용되는 SVA 프로퍼티
+@(posedge clk) disable iff(rst) // rst == 1이면 무시
+$isunknown(request) == 0; //x, z가 아닌지 확인
+endproperty 
+assert_request_2state : assert property(request_2state);  //어썬션 네임 : assert property(request_2state)
+endinterface

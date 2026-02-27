@@ -1,0 +1,240 @@
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
+
+#include <string>
+#include <vector>
+#include <map>
+#include <set>
+#include <unordered_map>
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
+#include <cstdlib>
+#include <cctype>
+
+using namespace std;
+
+// 간단한 오류 처리 함수
+inline void error(const string& s)
+{
+	throw runtime_error(s);
+}
+
+inline void error(const string& s1, const string& s2)
+{
+	error(s1 + s2);
+}
+template<class T, class U>
+T narrow_cast(U u)
+{
+	T t = static_cast<T>(u);
+	if (static_cast<U>(t) != u)
+		error("narrow_cast error");
+	return t;
+}
+
+// 디버깅용 출력
+template<class T>
+void print_vector(const vector<T>& v, const string& label = "")
+{
+	if (!label.empty()) cout << label << ": ";
+	for (const auto& x : v) cout << x << ' ';
+	cout << '\n';
+}
+
+void merge_s(vector <string>& v, int left, int mid, int right) {  //이미 정렬된 두 배열을 하나로 합침, 작은 값부터 temp에 넣음
+	int i = left;
+	int j = mid + 1;
+	int k = 0;
+
+	vector <string> temp(right - left + 1);
+	while (i <= mid && j <= right) {  // 두 부분 배열을 비교하며 병합
+		if (v[i] <= v[j]) {
+			temp[k++] = v[i++];
+		}
+		else {
+			temp[k++] = v[j++];
+		}
+	}
+	//두 whlie문은 순서 상관 없음 -> 어차피 한쪽 배열에만 값이 남아 있기 때문에
+	while (i <= mid)  //왼쪽 배열에 남은 것들
+		temp[k++] = v[i++];
+
+	while (j <= right) // 오른쪽 배열 남은 것들  
+		temp[k++] = v[j++];
+
+
+	for (i = left, k = 0; i <= right; i++, k++)  	//원래 배열로 복사
+		v[i] = temp[k];
+}
+
+
+
+void mergesort_s(vector <string>& v, int left, int right) {   //배열을 반으로 계속 분할, 끝까지 가면 멈춤 left >= right
+	if (left < right) { //단일 요소에서는 병합 x (if문 실행 안됨)
+		int mid = (left + right) / 2;
+
+		mergesort_s(v, left, mid);
+		mergesort_s(v, mid + 1, right);
+		merge_s(v, left, mid, right);
+	}
+}
+
+void merge_d(vector <double>& v, int left, int mid, int right) {  //이미 정렬된 두 배열을 하나로 합침, 작은 값부터 temp에 넣음
+	int i = left;
+	int j = mid + 1;
+	int k = 0;
+
+	vector <double> temp(right - left + 1);
+	while (i <= mid && j <= right) {  // 두 부분 배열을 비교하며 병합
+		if (v[i] <= v[j]) {
+			temp[k++] = v[i++];
+		}
+		else {
+			temp[k++] = v[j++];
+		}
+	}
+	//두 whlie문은 순서 상관 없음 -> 어차피 한쪽 배열에만 값이 남아 있기 때문에
+	while (i <= mid)  //왼쪽 배열에 남은 것들
+		temp[k++] = v[i++];
+
+	while (j <= right) // 오른쪽 배열 남은 것들  
+		temp[k++] = v[j++];
+
+
+	for (i = left, k = 0; i <= right; i++, k++)  	//원래 배열로 복사
+		v[i] = temp[k];
+}
+
+
+
+void mergesort_d(vector <double>& v, int left, int right) {   //배열을 반으로 계속 분할, 끝까지 가면 멈춤 left >= right
+	if (left < right) { //단일 요소에서는 병합 x (if문 실행 안됨)
+		int mid = (left + right) / 2;
+
+		mergesort_d(v, left, mid);
+		mergesort_d(v, mid + 1, right);
+		merge_d(v, left, mid, right);
+	}
+}
+
+enum class GENRE
+{fiction = 1, nonfiction, periodical, biography, children};
+//  1              2          3          4         5
+
+class Book {
+public:
+	class Invalid{};
+	string Isbn() const { return ISBN; };
+	string Title() const { return title; };
+	string Author_name() const { return author_name; };
+	string Copyright_information() const { return copyright_information; };
+	GENRE Genre() const { return genre; };
+	bool Is_loan() const { return is_loan; };
+	bool check_state() const { return !is_loan; }; //읽기 전용이므로 const로
+	bool is_valid() const;
+	Book(string i, string t, string a, string c, GENRE p)
+		:ISBN{ i }, title{ t }, author_name{ a }, copyright_information{ c }, is_loan{ false }, genre{ p }
+	{
+		if (!is_valid()) throw Invalid{};
+	};
+	bool is_valid_isbn(const string& isbn) const;
+	friend bool operator==(const Book& book1, const Book& book2); 
+	friend bool operator!=(const Book& book1, const Book& book2);
+	friend ostream& operator<<(ostream& os, const Book& book); //friend void operator>>(const Book& book); << 는 ostream 이용 << = 출력 / >> = 입력
+private:
+	string ISBN;
+	string title;
+	string author_name;
+	string copyright_information;
+	bool is_loan;
+	GENRE genre;
+};
+
+//bool operator==(const Book& book1, const Book& book2); // 연산자 오버로딩은 전역으로, 또는 friend를 사용해 비멤버 함수로 => Book::함수 명으로 접근 못함, private은 가능
+
+/*
+class Book {
+public:
+	bool operator==(const Book& other) const {
+		return ISBN == other.ISBN
+			&& title == other.title
+			&& author_name == other.author_name
+			&& copyright_information == other.copyright_information;
+	}
+};또는 이렇게
+*/
+
+bool Book::is_valid_isbn(const string& isbn) const {
+	int cnt_li = 0;
+	int cnt_ch = 0;
+	for (char c : isbn) {
+		switch (c) {
+		case 'n': case 'x':
+			cnt_li++;
+			break;
+		case '-':
+			cnt_ch++;
+			break;
+		}
+	}
+	if (cnt_li >= 4 && cnt_ch >= 3)
+		return true;
+	else
+		return false;
+}
+
+bool operator!=(const Book& book1, const Book& book2) {
+	return !(book1 == book2);
+}
+
+ostream& operator<<(ostream& os, const Book& book) {
+	cout << book.title << "\n"
+		<< book.author_name << "\n"
+		<< book.ISBN << "\n";
+}
+
+bool Book::is_valid() const {
+	return is_valid_isbn(ISBN) 
+		&& !title.empty()
+		&& !author_name.empty();
+}
+
+
+bool operator==(const Book& book1, const Book& book2)
+{
+	return (book1.Isbn() == book2.Isbn())
+		&& (book1.Title() == book2.Title())
+		&& (book1.Author_name() == book2.Author_name())
+		&& (book1.Copyright_information() == book2.Copyright_information());
+}
+
+class Patron {
+public:
+	string Username() const { return username; };
+	double User_number() const { return user_number; };
+	double Fee() const { return fee; };
+	void Set_fee(Patron& p, double reset) { p.fee = reset; };
+	bool is_charge(const Patron& p) const { return p.fee == 0; };
+private:
+	string username;
+	double user_number;
+	double fee;
+};
+
+typedef struct Transaction {
+	class Book;
+	class Patron;
+};
+
+class Library {
+public:
+
+private:
+	vector <Book> b;
+	vector <Patron> p;
+	vector <Transaction>t;
+};

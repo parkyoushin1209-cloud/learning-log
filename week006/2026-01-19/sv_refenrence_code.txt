@@ -1,0 +1,100 @@
+interface arb_if(input bit clk);
+    logic [1:0]grant, request;
+    bit rst;
+
+    clocking cb @(posedge clk); //상승 에지에서 활성화
+    output request; //동기 신호
+    input grant;
+    endclocking
+
+    modport TEST(clocking cb,  //(output request, rst, input grant, clk);
+    output rst);// 비동기 신호는 따로
+
+    modport DUT(input request, rst, clk
+                 output grant); //모드포트에는 모든 신호가 다 들어갈 피
+   
+    modport MONITOR(input request, grant, rst, clk);//monitor module과 interface연결
+endinterface
+
+module arb_with_ifc(arb_if arbif);//arb_if.DUT arbif로 사용 가능
+always @(posedege arbif.clk or posedge arbif.rst)
+begin
+    if(arbif.rst)
+    arbif.grant <= '0;
+end
+endmodule;
+
+module test_with_ifc(arb_if.TEST arbif);//arb_if.TEST arbif
+initial begin
+    @arbif.cb;
+    arbif.cb.request <= 2'b01;
+    @arbif.cb;
+    $display("@%0t : Grant = %b", $time, arbif.cb.grant);
+    @arbif.cb;
+    $display("@%0t : Grant = %b", $time, arbif.cb.grant);
+    $finish;
+end
+endmodule;
+
+module monitor(arb_if.MONITOR arbif);// 실제 버스 구현시 명령어 해석 + 상태(completed, failed) 추가해서
+always @(posedge arbif.request[0])begin
+    $display("@%0t : request[0] asserted", $time);
+    @(posedge arbif.grant[0]);
+    $display("@%0t : grant[0] asserted", $time);
+end
+
+always @(posedge arbif.request[1])begin
+    $display("@%0t : request[1] asserted", $time);
+    @(posedge arbif.grant[1]);
+    $display("@%0t : grant[1] asserted", $time);
+end
+endmodule;
+
+module top;
+bit clk;
+always #50 clk = ~clk;
+arb_if arbif(clk);
+arb_if_ifc a1(.grant(arbif.grant), .request(arbif.request), .rst(arbif.rst)); //.port(ifc.signal) 또는 arbif - 하위 모듈에서 모드포트 이미 지정함
+test_with_ifc t1(arbif);
+endmodule : top
+
+program automatic test(bus_if.TB bus);
+initial begin
+    @bus.cb;
+    repeat(3) @bus.cb;
+    @bus.cb.grant;
+    @(posedge bus.cb.grant);
+    @(negedge bus.cb.grant);
+    wait (bus.cb.grant == 1);
+    @(posedge bus.cb.grant or
+    negedge bus.rst);
+end
+endprogram;
+
+program automatic test_with_cb(arb_if.TEST arbif);
+initial begin
+    @arbif.cb;
+    arbif.cb.request<=2'b01;
+    $display("@%0t: Drove req = 01", $time);
+    repeat(2)@arbif.cb;
+    if (arbif.cb.grant == 2'b01)
+    $display("@%0t: Success: grant == 2'b01", $time);
+    else
+    $display("@%ot: Error: grant != 2'b01", $time);
+end
+endprogram:test_with_cb
+
+
+/* 인터페이스 내부 클로킹 블록에
+1. clocking cb @(posedge clk);
+   default input #15ns output #10ns; //input은 상승에지 15ns전에 샘플됨 output은 상승에지 10ns 이후 구동됨
+   output request;
+   input grant;
+   endclocking
+
+2. clocking cb @(posedge clk);
+   output #10ns request;
+   input #15ns grant;
+   endclocking
+
+*/

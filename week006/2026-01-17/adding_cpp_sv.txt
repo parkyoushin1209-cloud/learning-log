@@ -1,0 +1,6 @@
+sv
+enum안에 값이 많지 않은 경우 enum logic[1:0] 등을로 선언해 메모리 사용을 줄일 수 있다.
+
+c++
+  double z = int x + int y;로 둘 셩우 결과를 계산한 후 타입이 변환되기 때문에 double에 오버플로우가 발생한 후의 int값이 변환되어 저장된다.
+<limits> 헤더를 포함할 경우 numeric_limits<int>::max)로 int형 최댓값 확인이 가능하다.

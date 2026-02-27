@@ -1,0 +1,24 @@
+적절한 시간에 동기 신호를 받고 구동하지 않으면(드라이브가 늦거나 샘플이 너무 이름) 테스트 벤치가 사이클에 어긋날 수 있다.
+클럭킹 블록을 통한 동기 신호 타이밍 조절
+-인터페이스는 클럭과 관련된 동기 신호 타이밍 명시를 위해 클럭킹 블록을 포함해야 한다.
+-합성 도구는 클록킹 블록을 지원하지 않아 RTL코드가 이점을 얻지는 못하나 모든 상세 타이밍 정보를 모아 둘 수 있다는 점에서 좋다.
+-두 개 이상 존재도 가능하며 클럭 도메인당 하나다
+-default문으로 클럭 스큐 명시 가능 기본적으로 디자인 실행전 샘플, 현대 타임 슬롯동안 출력신호는 다시 구동된다. => 레이스 컨디션 방지 가능
+-클록킹 블록 정의 시 TB에 @ifc_name.clocking_block_name 형태로 사용 가능 => 클록킹 블록에서 에지, 클록 변경시 테스트 벤치에는 수정 필요 없ㅇㅁ
+
+프로그램 블럭과 타이밍 지역
+
+한 타임 슬롯 과정
+1-1.Active: simulation of design code in modules, 일반 always, initial 블록 실행
+1-2.Inactive: 논블로킹 할당 업데이트
+1-3NBA(논블로킹 할당): 논블로킹 할당 적용
+2.Observed: evaluaion of systemverilog Assertions -> 1 가능
+3.Reactive: execution of testbench code in programs -> 1 가능
+4. postponed: sample
+  
+  프로그램 블록
+  -DUT와 TESTBENCH 사이의 race condition을 방지한다.
+  -test는 단일 프로그램에 포함되어야 한다.
+  -모듈 대신 객체로부터 동적, 계층적 테스트 벤치 생성을 위해 OOP를 사용해야 한다.
+  -여러 테스트를 혼합하거나 다른 사람의 코드를 사용할 경우 두 개의 프로그램 블록을 가질 수 있다.
+  -automatic은 스택 기반 언어와 같이 작동할 수 있으므로 사용

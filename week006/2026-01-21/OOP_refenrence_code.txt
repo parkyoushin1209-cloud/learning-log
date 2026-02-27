@@ -1,0 +1,103 @@
+class Transaction;
+bit [31:0] addr, csm, data[8];
+
+function new(input logic [31:0] a =3, d = 5);
+addr = a;
+data = '{default : d}; // csm은 기본값으로 x를 가짐 2-state면 0
+endfunction
+
+function void display();
+$display("Transaction: %h", addr);
+endfunction: display
+
+function void calc_csm();
+csm = addr ^ data.xor;
+endfunction: calc_sum
+endclass : Transaction
+
+initial begin
+  Transaction tr;
+  tr = new(.a(10)); // a는 10, d는 5
+end
+
+/*
+Transaction t1, t2;
+t1 = new();
+t2 = t1;
+t1 = new();
+t1 -> 2번 객체, t2 -> 1번 객체
+
+Transaction t;
+t = new(); // 1번 할당
+t = new(); // 2번 할당, 1번 할당 해제
+t = null; // 2번 할당 해제
+
+Transaction t;
+t = new();
+t.addr = 32'h42; // 클래스의 프로퍼티 접근법
+t.display();
+
+*/
+
+/* 메서드를 클래스 외부에 정의하는 법
+class Transaction
+extern function void display();
+endclass
+
+function void Transaction::display();
+~~
+endfunction
+*/
+
+/* count는 모든 클래스 객체가 공유함
+class Transaction;
+static int count = 0;
+int id;
+function new();
+id = count++;
+endfunction
+endclass
+
+Transaction t1, t2;
+t1 = new(); t1.count = 1, t1.id = 0;
+t2 = new(); t2. count = 2, t2.id = 1;
+t1.count = 2; t2.count = 2, Transaction::count = 2; t1.id = 0; t2.id = 1;
+*/
+
+/*
+class Config;
+int num_trans;
+function new(int num_trans = 0);
+~~
+endfunction
+endclass
+
+class Transaction;
+static Config cfg; //트랜잭션의 수를 가지는 실행 객체, static이 아니면 모든 객체가 고유값을 가지며 메모리 낭비임
+static int count = 0;//클래스의 모든 인스턴스가 하나의 객체로부터 정보를 가져야할 때 사용 가능
+int id;
+
+static function void display_statics();
+if(cfg == null)
+$display("ERROR : configuration not set");
+else
+$display("Transaction cfg.num_trans = %0d, count = %0d",cfg.num_trans, count);
+endfunction
+endclass
+
+Config cfg; 클래스 외부에서 만들고
+initial begin
+cfg = new(.num_trans(42)); //초기값 설정 후
+Transaction::cfg = cfg; //클래스 내  static 변수에 설정 객체를 연결
+Transaction::display_statics(); //static 함수 호출, static 변수를 읽고 쓸 때 사용
+end
+*/
+
+/*
+class scoping;
+string name;
+function new(input string name);
+this.name = name; // 클래스의 name 변수 = 지역 변수 name
+endfunction
+endclass
+*/
