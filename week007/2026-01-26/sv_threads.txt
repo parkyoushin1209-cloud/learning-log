@@ -1,0 +1,104 @@
+fork..join: 병렬적으로 실행됨
+begin...end: 순차적으로 실행됨
+
+fork...join_none: 현재 fork문 내에서 완료된 문장이 없더라도 부토 스래드 실행은 계속됨
+fork...join_any: 현재 fork문 내부에서 한 개라도 실행 완료된 이후 부모 스래드 다시 실행 시작됨
+
+  클래스 내에서 스레트 생성 가능함, 트랜재테의 생성자에서 스래드의 실행 없이 값만 초기화 하고 생성자와 클래스 내 다른 코드를 분리해 둠으로써 에러 주입, 기본값 수정, 객체 행동
+  변경을 허용할 수 있다.
+
+  Dynamic threads: 베릴로그의 경우 코드를 읽고 얼마나 많은 스레드가 있는지 카운트 하는 등 스레드가 예측 가능하지만
+  sv에서는 역동적으로 스레드 생성을 허용한다. 예를 들어 클래스의 태스크에 fork...join_none을 이용할 경우 태스크 여러번 호출 시 여러 스레드 생성됨
+
+//dynamic Threads
+program automatic test(bus_ifg.TB bus);
+task check_trans(input Transaction tr);
+fork
+  begin
+    wait(bus.cb.data == tr.data);
+    $display("@%0t: data match %d", $time, tr.data);
+  end
+join_none// 여러 번 호출 시 동시에 여러개의 스레드가 실행될 수 있음
+endtask
+
+Transaction tr;
+initial begin
+  repeat(10) begin
+    tr = new();
+    `SV_RAND_CHECK(tr.randomize());
+    transmit(t);
+  end
+  #100;
+end
+endprogram
+
+
+  
+  스레드를 생성하는 루프를 가지며 다음 반복 전 변수를 저정하지 않을 경우 문제가 발생할 수 있다. => automatic 사용하기
+
+//잘못된 예
+program no_auto;
+initial begin
+  for(int j=0; j < 3; j++)
+  fork
+    $write(j); //스레드가 3개 생성되기는 하나 #0 지연으로 인해 리스케줄링 되고 3 스레드 모두 3을 출력하게 됨
+  join_none
+  #0 $display; //#0 지연으로 인해 햔제 스레드가 진행되지 않고 현재 타임슬롯 이후 재시작되게 리스케줄
+end
+endprogram
+
+//수정 방안1
+/* fork ~~~ join_none 부분을
+fork
+automatic int k = j;
+begin
+$write(j);
+end
+join_none
+
+수정 방안 2
+for(int j =0 ; j < 3; j++) begin
+automatic int k = j;
+fork
+begin
+$write(k);
+end
+join_none
+
+  
+  program 블록 안에서 initial 문이 모두 완료될 경우 자식 스레드가 남아 있어도 종료가 되는 것을 막기 위해 wait fork;를 사용 가능하다. forl ... join 뒤에 둔다.
+  클래스의 루틴에서는 지역 변수, 클래스 변수, 프로그램에 정의된 변수를 사용가능하다. 선언을 잊어버릴 경우 의도치 않게 변수를 공유하게 되어버리는 경우가 생길 수 있다
+    => 코드에서 지역 변수의 경우 가능한 가장 작은 범위 안에 선언해서 사용하자 for문의 경우 for(i=0;~)가 아닌 for(int i=0;~~~) 형식으로 작성한다.
+
+스레드를 무효화할 수는 있으나 예상 못한 행동을 초래할 수 있으니 side effect를 생각하자
+
+단일 스레드 무효화는
+fork: single_thread
+~~~
+disable single_thread; 형식으로 가능하다
+join_none
+disable로 의도치 않게 너무 많은 스레드를 정지시킬 수 있다 특히 병렬로 실행되는 모니터, 드라이버 객체가 있을 경우 이러한 상황은 문제가 된다. 하나의 인스턴스일 경우는 안전
+
+여러 스레드 무효화의 경우
+disable fork를 사용하며 이 문장을 포함하고 있는 fork문이 무효화된다 의도치 않게 너무 많은 스레드를 멈추게 할 수 있으니 무효화하려는 문장을 fork, .. join으로 둘러준다.
+또는 fork 안에 명명된 begin...end 블록과 지연 + disable name을 두어 무효화하는 것도 가능하다.
+
+블록 내부에서 그 블록을 무효화 할 경우 예상했던 것보다 더 정지시키게 될 수 있으니 주의하자.
+task wait_for_time_out(input int id);
+if(id == 0)
+fork
+  begin
+    #2ns;
+    ...
+    disable wait_for_time_out;
+  end
+join_none
+...
+endtask
+
+initial begin
+  wait_for_time_out(0);
+  wait_for_time_out(1);
+  wait_for_time_out(2);
+end  // 이 코드의 경우 스레드는 3개가 생성되나 2ns 후 모든 스레드가 무효화되버린다.
+

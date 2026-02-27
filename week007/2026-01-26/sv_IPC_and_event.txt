@@ -1,0 +1,116 @@
+테스트벤치 내 모든 스레드는 동기화되고 데이터를 교환할 필요가 있다
+가장 기본 레벨에서 스레드는 다른 스레드를 기다린다.(generator가 완료되길 기다리는 환경 객체 등)
+=> 여러 스레드가 DUT의 버스 같은 단일 자원에 접근하려 할 경우 테스트벤치에서 한 번에 하나씩만 접근 가능하게 할 필요가 있다.
+가장 높은 레벨에서 스레드는 generator에서 agent로 전달되는 트랜잭션과 같은 정보를 교환할 필요가 있다.
+이런 데이터 교환, 조작 동기화는 interprocess communication이라 불리며 event, semaphores, mailboxes등으로 구현 가능하다.
+IPC는 보편적으로 3개의 파트가 있으며 정보를 생성하는 producer, 정보를 받는 consumer, 정보를 옮기는 channel 이다.
+
+이벤트
+에지에서의 변환을 나타내기 위해 @를 사용할 수 있다.
+event e1, e2;
+initial begin
+  $display("@%0t: 1: before trigger", $time);
+  ->e1;
+  @e2;
+  $display("@%0t: 1: after trigger", $time);
+end
+
+initial begin
+  $display("@%0t: 2: before trigger", $time);
+  ->e2;
+  @e1;
+  $display("@%0t: 2: after trigger", $time);
+end  이 코드의 경우 실행 결과 1 after나 2 after가 실행이 안될 수 있다. 이는 ->가 zero-width pulse를 생성하며 @가 zero-width pulse를 감지하기 때문이다.(zero-width pulse는 순간적)
+
+
+event e1, e2;
+initial begin
+  $display("@%0t: 1: before trigger", $time);
+  ->e1;
+  wait(e2.triggerd);
+  $display("@%0t: 1: after trigger", $time);
+end
+
+initial begin
+  $display("@%0t: 2: before trigger", $time);
+  ->e2;
+  wait(e1.triggerd);
+  $display("@%0t: 2: after trigger", $time);
+end // 이 경우에는 모두 출력 되긴하나 역시나 race condition이 발생 가능하다. wait는 레벨 반응형이며 그 타임 슬롯 안에서 발생시 즉시 진행한다.
+wait를 루프 안에서 사용 시 다시 기다리기 전 시간을 진행시키지 않으면 zero delay loop에 빠질 수 있다.
+
+forever begin
+  wait(handshack.triggerd);
+  $display;
+end // zero delay loop
+
+forever begin
+  @handshack;
+  $display;
+end // prevent zero delay loop
+
+시스템 베릴로그에서 이벤트는 루틴 사이에 전달 가능한 동기화 객체를 가리키는 핸들이다. 이를 통해 이벤트를 전역으로 만들 필요 없이 객체 사이에 공유가 가능하다.
+-보통 이벤트를 객체의 생성자에 전달할 때 쓰인다.
+또한 triggered 상태를 도입해 현재 타임 슬롯을 포함해 이벤트가 트리거 돼있는지 확일 할 수 있다. 이 함수를 이용해 스레드를 대기시킬 수도 있다.
+
+각 이벤트를 기다리기 위해 부모 스레드 안에서 for루프를 이용할 수 있으나 순서대로 실행되기 때문에 큰 지연이 생길 수 있다. 이에 대한 대안으로는 새 스레드를 만들어
+  자식을 스폰시키는 것이다.
+  event done[N_GENERATORS];
+
+initial begin
+  foreach(gen[i]) begin
+    gen[i] = new(done[i]);
+    gen[i].run();
+  end
+  foreach(gen[i])
+  fork
+    automatic int k = i;
+    wait(done[k].triggered);
+  join_none
+  wait fork;
+end
+
+    또 다른 대안으로는 트리거 된 이벤트의 수를 추적하는 것이다.
+  event done[N_GENERATORS];
+
+int done_count;
+initial begin
+  foreach(gen[i]) begin
+    gen[i] = new(done[i]);
+    gen[i].run();
+  end
+
+  foreach(gen[i])
+  fork
+    automatic int k = i;
+    begin
+      wait(done[k].triggered);
+      done_count++;
+    end
+  join_none
+  wait(done_count == N_GENERATORS);
+end
+
+ /// 다른 표현 방식
+class generator;
+static int thread_count = 0;
+task run();
+thread_count++;
+fork 
+  begin
+    //do the real work in here
+    //And when done, decrement the thread count
+thread_count--;
+  end
+join_none
+endtask
+endclass
+
+generator gen[N_GENERATORS];
+initial begin 
+  foreach(gen[i]);
+  gen[i] = new();
+  foreach(gen[i])
+  gen[i].run();
+  wait(generator::thread_count == 0 );
+end

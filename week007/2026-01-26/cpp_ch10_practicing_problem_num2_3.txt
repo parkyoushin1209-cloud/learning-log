@@ -1,0 +1,64 @@
+
+struct Reading {
+	int day;
+	int hour;
+	double temperature;
+};
+
+istream& operator>>(istream& is, Reading& r) {
+	char ch1;
+	if (!(is >> ch1) || ch1 != '{') {
+		is.unget();
+		is.clear(ios_base::failbit);
+		return is;
+	}
+	int day;
+	int hour;
+	double temperature;
+	char ch2;
+	char ch;
+	is >> day >> ch >> hour >> ch >> temperature >> ch2;
+	if (!is || ch2 != '}') error("입력 형식이 잘못 됨");
+	r.day = day;
+	r.hour = hour;
+	r.temperature = temperature;
+	return is;
+}
+
+ostream& operator<<(ostream& ost, const Reading& r) {//읽기는 const로
+	ost << '{' << r.day << ',' << r.hour << ',' << r.temperature << '}';
+	if (!ost) error("데이터 형식이 잘못됨");
+	return ost;
+}
+
+vector <Reading> r = { {4,10,10}, {4,11,12}, {4,15,12}, {4,19,10} };
+Reading new_r;
+cout << "{정수,정수,정수} 형식으로 입력하시오:";
+cin >> new_r;
+r.push_back(new_r);
+
+ofstream ost{ "raw_temps.txt" };
+if (!ost)error("출력 파일 열기 실패");
+for (int i = 0; i < r.size(); i++) {
+	ost << r[i] << "\n"; //줄 바꿈 있으면 보기 편함
+}
+
+ost.close();// 입력스트림에서 다시 사용하려면 닫고 하기
+
+vector <Reading> r = { {4,10,10}, {4,11,12}, {4,15,12}, {4,19,10} };
+
+ifstream ist{ "raw_temps.txt" };
+if (!ist)error("입력 파일 열기 실패");
+
+Reading n;
+
+vector <Reading> r2;
+
+for (int i = 0; i < r.size(); i++) {
+	ist >> n;
+	r2.push_back(n);
+}
+
+for (int i = 0; i < r2.size(); i++) {
+	cout << r2[i] << "\n";
+}

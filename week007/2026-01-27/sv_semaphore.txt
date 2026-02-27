@@ -1,0 +1,35 @@
+세마포는 자원 접근을 조절해주며 테스트벤치에서 자원을 가질 경우 사용될 수 있다.
+semaphore name; 형식으로 세마포 생성
+name = new(n)로 키 할당 , n은 키의 개수를 의미
+name.get(n) 으로 키 할당 요청
+name.put(n) 으로 키 반환
+name.try_get)으로 막힘 없이 키가 있으면 키를 얻고 1반환 없으면 0을 반환한다.
+
+1. 가져갔던 것보다 더 많은 키를 put하는 것도 가능하다.(자동차 1개 키 2개처럼)
+2. 키가 1개 있을 때 1번 스레드는 키 2개 요청할 경우 막히고 2번 스레드가 키를 1개 요청하게되면 먼저 가져간다.
+=> 다른 개수의 키를 요구하는 경우를 혼합할 때 자신만의 클래스를 작성해 누가 우선권을 가질지 명확히 할 수 있다.
+
+program automatic test(bus_ifc.TB bus);
+semaphore sem;
+initial begin
+  sem = new(1);
+  fork
+    sequencer();
+    sequencer();
+  join
+end
+
+task sequencer();
+repeat($urandom() % 10)
+@bus.cb;
+sendTrans();
+endtask
+
+task sendTrans();
+sem.get(1);
+@bus.cb;
+bus.cb.addr <= tr.addr;
+...
+sem.put(1);
+endtask
+endprogram

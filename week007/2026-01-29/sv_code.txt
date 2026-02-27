@@ -1,0 +1,175 @@
+virtual class BaseTr; //추상클래스(확장은 가능 인스턴시에이트는 불가능 - 모든 순수 가상 메서드 몸체 필요)
+static int count = 0;
+int id;
+
+function new();
+id = count++;
+endfunction
+
+pure virtual function bit compare(input BaseTr to); //endfunction, endtask 없음
+pure virtual function BaseTr copy(input BaseTr to = null);// 추상적 클래스 안에서만 선언 가능
+pure virtual function void display(input string prefix = "");
+endclass
+
+class Trasaction extends BaseTr;
+rand bit [31:0] src, dst, csm, data[8];
+
+extern fucntion new();
+extern virtual function bit compare(input BaseTr to); //extern에는 원래 함수에 인자가 있으면 그 인자도 같이 적어줘야 함
+extern virtual function BaseTr copy(input BaseTr to = null);
+extern virtual function void display(input string prefix = "");
+endclass
+
+function bit Trasnaction::new();
+super.new(); //BaseTr의 생성자 사용
+endfunction:new
+
+function Transaction::compare(input BaseTr to);
+Transaction tr; //Transaction 핸들 선언
+if(!cast(tr, to)) // 핸들에 다운캐스팅 : 부모 클래스의 핸들이 자식 클래스의 객체 가리킴
+$finish; // 주소 전달이 불가능하면 마무리
+return ((this.src == tr.src) &&
+        (this.dst == tr.dst) &&
+        (this.csm == tr.csm) &&
+        (this.data == tr.data));
+endfunction:compare
+
+function BaseTr Transaction::copy(input BaseTR to = null);
+Transaction cp;
+if(tp == null) cp = new(); //인자로 들어온 게 없으면 생성
+else           $cast(cp,to); // 인자로 들어온 있으면 다운캐스팅해 사용 => 기존거 재사용 가능
+cp.src = this.src;
+cp.dst = this.dst;
+cp.csm = this.csm;
+cp.data = this.data;
+return cp;
+endfunction : copy
+
+function void Transaction::display(input string prefix = "");
+$display("%sTransaction %0d src=%h, dst=%x, csm=%x",
+         prefix, id, src, dst, csm);
+endfunction
+
+////////////////////////////콜백: 기존 코드 수정 없이 기존 클래스에 새 기능 행위 변경 가능(에러 주입 등)
+virtual class Driver_cbs; // base callback lass -> 사용되기 전 반드시 확장 필요
+virtual task pre_tx(ref Transaction tr, ref bit drop);
+//By default, callback does nothing
+endtask
+
+virtual task post_tx(ref Transaction tr);
+//By default, callback does nothing
+endtask
+endclass
+
+class Driver;
+Driver_cbs cbs[$]; //확장된 클래스의 객체를 가질 수 있다. 추상 클래스 타입 변수 선언은 가능하다.
+mailbox #(Transaction) agt2drv;
+
+function new(input mailbox #(Transaction) agt2drv)
+this.agt2drv = agt2drv;
+endfunction
+
+task run();
+bit drop;
+Transaction tr;
+
+forever begin
+  drop = 0;
+  agt2drv.get(tr);
+  foreach(cbs[i])cbs[i].pre_tx(tr, drop);
+  if(drop) continue;
+  transmit(tr);
+  foreach(cbs[i]) cbs[i].post_tx(tr);
+end
+endtask
+endclass
+
+class Driver_Cbs_Drop extends Driver_cbs;
+virtual task pre_tx(ref Transaction tr, ref bit drop);
+//Randomly drop 1 out of every 100 Transactions
+drop = ($urandom_range(0,99) == 0); //1%
+endtask
+endclass
+
+class scoreboard;
+Transaction scb[$];
+
+function void save_expected(input Transaction tr);
+scb.push_back(tr); //예측한 트랜잭션 저장(메모리)
+endfunction
+
+function void compare_actual(input Transaction tr);
+int q[$];
+q = scb.find_index(x) with (x.src == tr.src); // 여러개 있으면 여러개 저장 가능 q는 큐이다. 예측한 트랜잭션과 실제 트랜잭션이 일치하면 인덱스 저장
+case(q.size())
+0:$display("No match found");
+1:scb.delete(q[0]);
+default:$display("Error, multiple matches found!");
+endcase
+endfunction:compare_actual
+endclass
+
+class Driver_Cbs_Scoreboard extends Driver_cbs;
+scoreboard scb;
+
+virtual task pre_tx(ref TRansaction tr, ref bit drop);
+scb.save_expected(tr);
+endtask
+
+function new(input scoreboard scb);
+this.scb = scb;
+endfunction
+endclass
+
+
+
+//////////parameterized class
+parameter SIZE = 100;
+class Stack #(type T = int);
+local T stack[SIZE];
+local int top;
+
+function void push(input T i);
+stack[top++] = i;
+endfunction : push
+
+function T pop();
+return stack[--SIZE];
+endfunction
+
+endclass
+
+
+class GenBase;
+endclass
+
+class Generator #(type T = BaseTr) extends GenBase;
+mailbox #(Transaction) gen2drv;
+T blueprint;
+
+function new(input mailbox #(Transaction) gen2drv);
+this.gen2drv = gen2drv;
+blueprint = new();
+endfunction
+
+task run(input int num_tr = 10);
+T tr;
+repeat(num_tr) begin
+  `SV_RAND_CHECK(blueprint.randomize);
+  $cast(tr,blueprint.copy());
+  gen2drv.put(tr);
+end
+endtask
+endclass
+
+module test;
+GenBase gen_queue[$];
+Generator #(Transaction) gen_good;
+Generator #(BadTr) gen_bad;
+initial begin
+  gen_good = new();
+  gen_queue.push_back(gen_good);
+  gen_bad = new();
+  gen_queue.push_back(gen_bad);
+end
+endmodule;

@@ -1,0 +1,76 @@
+
+template<class T>
+char* as_bytes(T& i) {//T를 일련의 바이트로 취급
+	void* addr = &i;// 객체를 저장하는 메모리 첫 바이트의 주소 가져오기
+	return static_cast<char*>(addr); //그 메모리를 일련의 바이트로 취급
+}
+
+
+int main() {
+	cout << "입력 파일 이름 입력\n";
+	string iname;
+	cin >> iname;
+	ifstream ifs{ iname, ios_base::binary }; //스트림 모드 설정
+	//binary로 열면 스트림이 바이트를 조작하지 않음
+	if (!ifs)error("입력 파일 열기 실패");
+
+	cout << "출력 파일 이름 입력\n";
+	string oname;
+	cin >> oname;
+	ofstream ofs{ oname, ios_base::binary };
+	//binary로 열면 스트림이 바이트를 조작하지 않음
+	if (!ofs)error("출력 파일 열기 실패");
+
+	vector <int> v;
+
+	for (int x; ifs.read(as_bytes(x), sizeof(int));) // 바이트 읽기/ as_bytes로 메모리에서 바이트가 처음 시작되는 주소 반환, sizeof(int)로 바이트 크기 알려줌
+		v.push_back(x);
+
+	//.....v를 이용해 작업 수행
+
+	//파일에 바이너리 쓰기
+	for (int x : v)
+		ofs.write(as_bytes(x), sizeof(int));
+	return 0;
+}
+
+
+fstream fs{ name };
+if(!fs)error("열기 실패");
+fs.seekg(5); // 읽기(get) 위치를 5로(6번째 문자)로 이동
+char ch;
+fs >> ch; // 읽기 위치 한 칸 증가
+cout << "character[5]는" << ch << '(' << int(ch) << ")\n";
+fs.seekp(1); // 쓰기(put) 위치를 1로 이동
+fs << 'y'; // 쓰기 위치 증가
+
+
+문자열 스트림
+string을 istream의 데이터 출처로 ostream의 출력 대상으로 이용 가능함
+일반적으로 istringstream을 string으로 초기화한 후 그 string에서 문자를 읽음
+ostringstream을 빈 string으로 초기화한 후 출력 연산자로 그 string 채워감
+ss.str() ss내용의 string 사본 반환
+ss.str(s) ss 내부 string을 s의 사본으로 설정
+
+
+double str_to_double(string s){
+istringstream is {s}; // string의 끝을 읽으려고 하면 eof() 상태가 됨
+double d;
+is >> d;
+if(!is) error("double 형식 오류");
+return d;
+
+
+void my_code(string label, Temperature temo)
+{
+//....
+ostringstream os;
+os << setw(8) << label << ":"
+   << fixed << setprecision(5) << temp.temp << temp.unit;
+   someobject.display(Point(100,100), os.str().c_str());
+   //str()은 ostringstream의 멤버 함수로 출력 연산의 결과로 생성된 string 반환
+   //c_str()은 string의 멤버 함수로 많은 시스템 인터페이스에서 요구하는 c스타일의 문자열 반환
+   //.....
+}
+
+

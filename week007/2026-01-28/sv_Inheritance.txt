@@ -1,0 +1,53 @@
+복잡한 클래스 만들 때 
+1. 하나의 클래스에다만 만들면 간단하고 이해 쉬움, 하지만 발전, 디버그가 느려질 수 있으며 유지하기 어렵다
+2. 클래스 안에 다른 클래스를 추가한다면(구성) 작성 및 디버그 시 어느 클래스를 접근해야 할지 항상 먼저 찾아야하며 때때로 기능을 나누기 힘든 경우 존재. 
+좋은 트랜잭션과 에러 트랜잭션을 구분해야하며 좋은 트랜잭션을 테스트하기 위한 코드 외에 추가적인 코드 작성이 필요하다.
+3. 상속 이용
+
+상속
+-새 클래스를 확장할 경우 기존 클래스의 메서드, 변수 등을 그대로 활용 가능. 기능을 더함으로써 재사용성을 높여준다.(기존 클래스 수정 필요 없음)
+
+//기존 클래스 , parent class, superclass
+class Transaction;
+rand bit[31:0] src, dst, data[8];
+bit [31:0] csm;
+
+virtual function void check_sum(); // virtual은 이후 추가적으로 확장할 수도 있으므로 항상 사용
+csm = src ^ dst ^ data.xor;
+endfunction
+
+virtual function void display(input string prefix = " ");
+$display("%str: src=%h, dst=%h, csm=%h, data=%p",
+prefix, src, dst, csm, data);
+endfunction
+
+endclass
+
+//확장된 클래스, subclass, derived
+class BadTr extends Transaction; // class subclass_name extends superclass_name
+rand bit bad_csm;
+
+virtual function void calc_csm(); 
+super.calc_csm(); //superclass의 calc_csm 메서드
+if(bad_csm) csm = ~csm; //확장된 클래스는 기존 클래스의 변수를 가지고 있으므로 계층적 참조 불필요
+endfunction
+
+virtual function void display(input string prefix = " ");
+$write("%sBadTr: bad_csm = %b",prefix, bad_csm);
+super.display();
+endfunction
+endclass
+
+class Base;
+int val;
+function new(input int val); // base 클래스의 생성자 함수에 인자가 존재하면
+this.val = val;
+endfunction
+endclass
+
+class Extended extends Base;
+function new(input int val); //확장된 클래스의 첫 째줄에서 그 함수를 호출해야 함
+super.new(val);
+//other construction actions
+endfunction
+endclass

@@ -1,0 +1,21 @@
+
+class Packet;
+rand bit [31:0] length;
+constraint c_short{length inside {[1:32]};}
+constraint c_long{length inside {[1000:1023]};}
+endclass
+
+module test;
+Packet p;
+initial begin
+p = new();
+p.c_short.constraint_mode(0);
+`SV_RAND_CHECK(p.randomize());
+transmit(p);
+
+p.constraint_mode(0);
+p.c_short.constraint_mode(1);
+`SV_RAND_CHECK(p.randomize() with {length == 30});
+trasmit(p);
+end
+endmodule

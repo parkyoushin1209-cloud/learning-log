@@ -1,0 +1,110 @@
+program automatic unsynchronized; // 비동기방식
+
+mailbox #(int) mbs; mailbox int형 저장할 것임
+
+class Producer; 
+task run();
+for(int i = 1; i <4; i++) begin
+  $display("Producer: before put(%0d)", i);
+  mbx.put(i); //이 후 get
+end
+endtask
+endclass
+
+class Consumer;
+int i;
+task run();
+repeat(3) begin
+  mbx.get(i); // blocking 돼있음
+  $display("Consumer: after get(%0d)", i);
+end
+endtask
+endclass
+
+put_display 3개 이후 get_display 3개 (블로킹 돼있으므로)
+
+/*
+동기화 => 여전히 consumer가 producer보다 한 트랜잭션 늦음 => producer display 2회 이후 consumer display
+class Consumer;
+task run();
+int i;
+repeat(3) begin
+mbx.peek(i); //remove 없이 데이터 확인만
+$display("Consumer: after peak(%0d)", i);
+mbx.get(i);// processing 후 없애기
+end
+endtask
+endclass
+*/
+
+Producer p;
+Consumer c;
+
+initial begin
+  mbx = new();
+  p = new();
+  c = new();
+
+  fork
+    p.run();
+    c.run();
+  join
+end
+endprogram
+
+
+/* 완전한 동기화 방식
+1. 이벤트를 이용(wait의 경우 한 타임 슬롯에 한 번만 막을 수 있으므로 시간 움직여줘야 함 @는 여러번 가능 but trigger, block이 한 타임 슬롯에서 발생시 순서 문제 가능)
+mailbox #(int) mbx;
+event handshake;
+
+class Producer;
+task run();
+for(int i = 1; i<4;i++) begin
+... 출력
+mbx.put(i);
+@hanshake; // Consumer에서 ->handshake 해줘야 넘어감
+... 출력
+end
+endtask
+endclass
+
+class Consumer;
+task run();
+int i;
+repeat(3) begin
+mbx.get(i);
+... 츌력
+-> handshake;
+end
+endtask
+endclass
+
+두 개의 메일 박스 이용
+mailbox #(int) mbx, rtn;
+
+class Producer;
+task run();
+int k;
+for(int i=1;i<4;i++) begin
+$display("Producer: before put(%0d)", i);
+mbx.put(i);  //P-put -> C_get -> C_put -> P_get 반복
+rtn.get(k);
+$display("Producer: after get(%0d)", k);
+end
+endtask
+endclass
+
+class Consumer;
+task run();
+int i;
+repeat (3) begin
+$display("Consumer: before get");
+mbx.get(i);
+$display("Consumer: after get(%0d)", i);
+rtn.put(-i);
+end
+endtask
+endclass
+
+*/

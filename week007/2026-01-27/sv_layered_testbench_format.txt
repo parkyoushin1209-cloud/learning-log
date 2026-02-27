@@ -1,0 +1,105 @@
+class Agent;
+mailbox #(Transaction) gen2agt, agt2drv;
+Transaction tr;
+
+function new(input mailbox #(Transaction)gen2agt, agt2drv);
+this.gen2agt = gen2agt; //generator -> agent 트랜잭션 저장
+this.agt2drv = agt2drv; // agent -> driver
+endfunction
+
+task run();
+forever begin
+gen2agt.get(tr);
+...  // generator 에서 트랜잭션 받고 처리 과정 이후 driver로 넘김
+agt2drv.put(tr);
+end
+endtask
+
+task wrap_up(); // 마무리 과정
+endtask
+endclass
+
+class Config;
+rand bit[31:0] run_for_n_trans;
+
+constraint reasonable{
+  run_for_n_trans inside {[1:1000]}; 
+}
+
+endclass
+
+class Environment;
+Generator gen;
+Agent agt;
+Driver drv;
+Monitor mon;
+Checker chk;
+scoreboard scb;
+Config con;
+// layered TB에서 assertions 클래스 제외 다 있음 + cfg
+mailbox #(Transaction) gen2agt, agt2drv, mon2chk; 
+
+extern function new(); 
+extern function void gen_cfg();
+extern function void build();
+extern function void build();
+extern task run();
+extern task wrap_up();
+
+endclass
+
+function Environment::new(); 
+cfg = new(); //cfg객체 생성
+endfunction
+
+function void Environment::gen_cfg();
+`SV_RAND_CHECK(cfg.randomize()); //cfg 랜덤화
+endfunction
+
+function void Environment::build();
+gen2agt = new();
+agt2drv = new();
+chk2mon new();
+//mailbox 초기화
+
+gen = new(gen2agt);
+agt = new(gen2agt, agt2drv);
+drv = new(agt2dr);
+mon = new(agt2drv);
+chk = new(mon2chk);
+scb = new(cfg);
+// 클래스 객체 초기화
+endfunction
+
+task Environment::run();
+fork // 병렬실행
+  gen.run(cfg.run_for_n_trans);
+  agt.run();
+  drv.run();
+  mon.run();
+  chk.run();
+  scb.run(cfg.run_for_n_trans);
+join
+endtask
+
+task Environment::wrap_up();
+fork
+gen.wrap_up();
+agt.wrap_up();
+drv.wrap_up();
+mon.wrap_up();
+chk.wrap_up();
+scb.wrap_up();
+join
+endtask
+
+program automatic test;
+Environment env;
+initial begin
+  env.new();
+  env.gen_cfg();
+  env.build();
+  env.run();
+  env.wrap_up();
+end
+endprogram

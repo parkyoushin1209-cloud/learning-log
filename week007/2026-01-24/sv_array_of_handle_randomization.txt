@@ -1,0 +1,24 @@
+parameter MAX_SIZE = 10; 
+class RandStuff;
+rand bit[31:0] value;
+endclass
+
+class RandArray;
+rand RandStuff array[]; //rand로 설정
+constraint c{array.size() inside {[1:MAX_SIZE]};}
+
+function new();
+array = new[MAX_SIZE];
+foreach(array[i])
+array[i] = new();
+endfunction
+endclass
+module test;
+RandArray ra;
+initial begin
+    ra = new();
+    'SV_RAND_CHECK(ra.randomize());
+    foreach(ra.array[i])
+    $display(ra.array[i].value);
+end
+endmodule

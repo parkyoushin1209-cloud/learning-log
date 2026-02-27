@@ -1,0 +1,66 @@
+
+blueprint pattern
+-generator에서 에러가 주입된 트랜잭션의 클래스와 정상 트랜잭션의 클래스를 바꿔가며 생성할 수 있게 해줌
+블루프린트 객체 생성 후 제약을 수정하거나 확장된 객체로 교체 가능하다
+전송할 블루프린트의 복사를 만들기 위해 복사 메서드를 만들 필요가 있다.(원래 블루프린트는  유지되도록)
+
+class generator;
+mailbox #(Transaction) gen2drv;
+Transaction blueprint;
+
+function new(input #(Transaction) gen2drv);
+this.gen2drv = gen2drv;
+blueprint = new(); 
+//핸들의 선언과 객체 생성을 분리하듯 블루프린트 객체 랜덤화와 생성을 분리할 필요 있음
+//=> 같은 곳에 존재한다면 반복문을 통과하는 동안 매번 새 객체가 생성돼 randc의 이력을 보존할 수 없다.
+endfunction
+
+task run(input int num+tr = 10);
+repeat(num_tr) begin
+`SV_RAND_CHECK(blueprint.randomize()); //랜덤화
+gen2drv.put(blueprint.copy()) // 복사본을 넘겨 줌
+end
+endtask
+endclass
+
+환경 클래스의 실행단계는 build run wrap_up 나뉜다.
+class Environment;
+Generator gen;
+Driver drv;
+mailbox #(Transaciton) gen2drv;
+
+virtual function void build();
+gen2drv = new(); // 메일박스 먼저 생성후
+gen = new(gen2drv);// 발생기, 드라이버에 인자로 넣어줌
+drv = new(gen2drv);
+endfunction
+
+virtual task run();
+fork
+  gen.run();
+  drv.run();
+join
+endtask
+
+virtual task wrap_up();
+//Empty for now - callscoreboard for report
+endtask
+endclass
+
+program automatic test;
+Environment env;
+
+initial begin
+  env = new();
+  env.build();
+  ///트랜잭션 클래스 변경은 여기서
+  begin
+    BadTr bad = new();//여기서는 객체를 생성해 추가적인 설정을 해줄 필요가 없으므로 한 번에 사용
+    //여기서의 제약과 부모클래스의 제약의 이름이 같을 경우 여기서의 제약 사용
+  env.gen.blueprint = bad;
+  end
+  //begin end로 가독성 올려줌
+  env.run();
+  env.wrap_up();
+end
+endprogram

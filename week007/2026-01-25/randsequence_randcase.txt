@@ -1,0 +1,88 @@
+//randsequence 사용 예제
+장점: 
+절차적 코드이므로 실행 중 디버그, 디스플레이 가능
+
+단점: 
+시퀀스에 의해 사용되는 제약 데이터를 가지는 클래스 형식과 매우 다르며 시퀀스 생성을 위한 코드가 분리된다. 
+=> randomize와 함께 사용하려면 두 개이 다른 랜덤화 형식 숙달 필요
+시퀀스 수정 시 시퀀스 코드 원본을 수행해야함(클래스는 확장 가능), 단지 확장은 불가능
+
+module test;
+initial begin
+    for(int i=0; i< 15; i++) begin
+        randsequence (Stream)
+        stream: cfg_read := 1 |
+                io_read  := 2 |  // | 는 or로 선택을 한다고 보면 됨
+                mem_read := 5;
+        cfg_read : {cfg_read_task(); } |   // 한 번 호출
+                   {cfg_read_task() ; } cfg_read; // 한 번 호출 및 다시 cfg_read
+        mem_read : {mem_read_task(); } |
+                   {mem_read_task(); } mem_read;
+        io_read  : {io_read_task() ; } |
+                   {io_read_task() ; } io_read;
+    endsequence
+    end
+end
+endmodule
+
+//randcase
+-이를 이용해 클래스나 인스턴스 생성 없이 여러 행위 사이에 가중치 부여된 선택지를 만들 수 있음
+-확률에 따라 값 선택후 분기 선택, 분기는 순서에 의존하지 않으며 가중치는 변수가 될 수 있음 합이 100일 필요는 없음
+-랜덤제약보다 수정하고 오버라이드 하기 어려움
+-흔적을 안 남기니 주의
+-트랜잭션에 에러 넣을지 안 넣을지 결정시 사용 가능하지만 이 선택을 downstream 트랜잭터와 스코어보드가 알아야함 이를 위해 환경이나 트랜잭션 내 변수를 사용해 알리는게 좋다.
+-작은 케이스에서는 randcase가 유리할 수 있으나 크기가 커지면 OOP를 사용한 constraint를 사용하는게 더 간결함
+module test2;
+initial begin
+    rand bit[15:0] len;
+    randcase
+        1 : len = $urandom_range(0,2);  //10%
+        8 : len = $urandom_range(3,5);   // 80%
+        1 : len = $urandom_range(6,7);   // 10%
+    endcase
+    $display("len = %0d", len);
+end
+endmodule
+
+//위와 동일한 내용을 가리키는 클래스
+class LenDist;
+rand bit[15:0] len;
+constraint c{len dist {[0,2] := 1, [3:5] := 8, [6:7] := 1}}
+endclass
+
+module test3;
+initial begin
+    LenDist lenD;
+    lenD = new();
+    `SV_RAND_CHECK(lenD.randomize());
+    $display("len = %0d", lenD.len);
+end
+endmodule
+
+
+///////decision tree 생성
+
+initial begin
+    randcase  //1level
+        one_write_wt: do_one_write();
+        one_read_wt: do_one_read();
+        seq_write_wt: do_seq_write();
+        seq_read_wt: do_seq_read();
+    endcase
+end
+
+task do_one_write(); //2level
+randcase
+    mem_write_wt: do_mem_write();
+    io_write_wt: do_io_write();
+    cfg_write_wt: do_cfg_write();
+endcase
+endtask
+
+task do_one_read();  //2level
+randcase
+    mem_read_wt: do_mem_read();
+    io_read_wt: do_io_read();
+    cfg_read_wt: do_cfg_read();
+endcase
+endtask

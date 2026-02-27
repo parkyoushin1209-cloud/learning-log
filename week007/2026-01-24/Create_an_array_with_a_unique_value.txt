@@ -1,0 +1,54 @@
+고유 값을 가지는 배열 생성
+
+class RandcRange;
+    randc bit [15:0] value;
+    int max_value;
+
+    function new(input int max_value);
+        this.max_value = max_value;
+    endfunction
+
+    constraint c_max_value { value < max_value; }
+endclass
+
+class UniqueArray;
+    int max_array_size, max_value;
+    rand bit [15:0] ua[];
+
+    constraint c_size { ua.size() inside {[1:max_array_size]}; }
+
+    function new(input int max_array_size = 2, input int max_value = 2);
+        this.max_array_size = max_array_size;
+        if (max_value < max_array_size)
+            this.max_value = max_array_size;
+        else
+            this.max_value = max_value;
+    endfunction
+
+    function void post_randomize();
+        RandcRange rr;
+        rr = new(max_value);
+        foreach (ua[i]) begin
+            `SV_RAND_CHECK(rr.randomize());
+            ua[i] = rr.value;
+        end
+    endfunction
+
+    function void display();
+        $write("size : %3d:", ua.size());
+        foreach (ua[i]) $write("%4d", ua[i]);
+        $display;
+    endfunction
+endclass
+
+program automatic test;
+    UniqueArray ua;
+    initial begin
+        ua = new(50);
+
+        repeat (10) begin
+            `SV_RAND_CHECK(ua.randomize());
+            ua.display();
+        end
+    end
+endprogram

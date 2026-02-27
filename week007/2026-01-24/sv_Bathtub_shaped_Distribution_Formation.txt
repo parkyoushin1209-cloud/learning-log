@@ -1,0 +1,14 @@
+//욕조모양 분포 형성
+class Bathtub;
+int value; //random variable with bathtub dist
+int WIDTH = 50, DEPTH = 6, seed = 1;
+
+function void pre_randomize();
+value = $dist_exponential(seed, DEPTH);//calculate an exponential curve
+if(value > WIDTH) value = WIDTH;
+
+//Randomly put this point on the left ir right curve
+if($unrandom_range(1))  //Random 0 or 1
+value = WIDTH - value;
+endfunction
+endclass

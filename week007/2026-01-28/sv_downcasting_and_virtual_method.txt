@@ -1,0 +1,41 @@
+downcasting, conversion: 기본클래스 핸들을 이 클래스를 상속한 서브클래스 객체를 가리키도록 만드는 행동
+Transaction tr;
+BadTr bad;
+bad = new();
+tr = bad;
+이처럼 기본 클래스가 서브클래스를 가리키게 만드는 것은 가능하나 그 반대는 불가능함
+
+$cast는 핸들에 의해 참조되는 핸들이 아닌 객체의 타입을 확인한다.
+$cast(dst,  src) 형식으로 작성하며 두 객체가 같은 타입이거나 dst클래스가 src로부터 확장된 클래스면 주소 복사가 가능하다.
+cast를 테스크로 활용시 런타임 떄 타입을 확인 후 서로 다르면 에러 함수로 사용시 서로 같으면 1 다르면 0을 반환한다.
+
+Transaction tr;
+BadTr bad, bad2;
+bad = new();
+tr = bad;
+
+$cast(bad2, tr); /태스크
+// 여기서 bad2는 tr에서 확장된 클래스의 핸들이므로 참이다.
+//if문의 대안으로 `SV_RAND_CHECK 등의 메크로를 사용 가능하다
+//어써션 무효화 시 어써션 표현식 평가가 안되므로 즉각적인 어써션 사용 피하기($cast, bad2할당이 실행되지 않을 수도 있음)
+if($cast(bad2, tr)) // 함수
+$display("success");
+else
+$display("fail");
+
+initial begin
+  tr = new();
+  tr.calc_csm(); //Transaction::calc_csm 실행
+
+  bad = new();
+  bad.calc_csm(); //BadTr::calc_csm 실행
+//부모 클래스 타입 핸들로 호출해도 실제 객체 타입의 메서드가 실행되는 것은 다형성(polymorphism)이라 하며 여러 메서드가 공통된 이름을 공유한다.
+  tr = bad;
+  tr.calc_csm();//BadTr::calc_csm 실행 => 호출할 메서드는 핸들 타입 기반이 아닌 객체 타입 기반으로 선택됨
+                //=> new함수를 실행할 시점에서는 객체가 없으므로 new는 virtual로 만들 수 없다. 
+                //또한 함수에 virtual이 없다면 Transaction::calc_csm이 실행된다.
+end
+
+가상 메서드 사용의 단점은 한 번 정의 시 모든 확장된 클래스(같은 메서드를 정의하는)는 반드시 같은 시그니처(같은 수의 인자, 같은 인자 타입 반환형 타입 등이)
+를 사용해야 한다. => 인자를 추가하거나 task를 함수로 정의하는 게 가능하게 되면 다형성이 깨진다.(다른 메서드로 인식해 부모 클래스에서 호출될 수도 있다)
+코드는 확장된 클래스가 같은 인터페이스를 가질 것이라는 보증을 갖고 가상메서드를 호출 가능해야 할 필요 있음

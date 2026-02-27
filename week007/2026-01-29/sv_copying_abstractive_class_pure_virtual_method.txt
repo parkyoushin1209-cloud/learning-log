@@ -1,0 +1,21 @@
+복사를 위해 목적지 명시하기
+장점: 기존에 쓰던 객체를 재사용할 수 있음
+vitual function Transaction copy(input Transaction to = null)
+  Transaction tr;
+  if(to == null) tr = new();
+  else           tr = to;
+  ...모든 변수 복사 후 copy 반환
+
+  vitual function Transaction copy(input Transaction to = null)
+    BadTr bad;(확장된 클래스의 핸들)
+    if(to == null) bad = new();
+    else
+      $cast(bad, to); 이 경우는 cast 이용
+
+  virtual class BaseTr; //추상적 클래스
+    //이 클래스로는 인스턴시에이트 불가능, 확장되고 모든 순수 가상 메서드의 몸체를 구현해주면 확장된 클래스는 인스턴시에이트 가능
+    //핸들은 가질 수 있음, 몸체가 있거나 없는 가상 메서드, 순수 가상 메서드, 논가상 메서드를 가질 수 있음
+    변수 및 행위문
+    pure virtual function bit compare(input BaseTr to); // pure 메서드는 endfunction, endtask 를 가지지 않음, 추상적 클래스 안에서만 선언 가능
+      ...
+      

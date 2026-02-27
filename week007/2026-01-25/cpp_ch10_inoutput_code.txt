@@ -1,0 +1,182 @@
+const int not_a_reading = -7777; // 측정치 없음의 개념(측정치를 알기 전 Month와 Day를 Year의 일부로 만들 계획임) , 절대온도 0도보다 작은 값
+const int not_a_month = -1;// 비어있는 달
+constexpr int implausible_min = -200;
+constexpr int implausible_max = 200;
+vector <string> month_input_tb1 = { // month 기호 상수 입력시 숫자 입력시 숫자로 반환해주기 위해 테이블 생성
+"jan", "feb", "mar", "apr", "may", "jun", "jul",
+"aug", "sep", "oct", "nov", "dec"
+};
+
+
+vector <string> month_print_tb1 = { // 완전한 문자열 출력을 위해 테이블 생성
+	"January", "February", "March", "April", "May", "June", "July",
+	"August", "September", "October", "November", "December"
+};
+
+
+void end_of_loop(istream& ist, char term, const string message) {
+	if (ist.fail()) {
+		ist.clear();
+		char ch;
+		if (ist >> ch && ch == term) return;
+		error(message);
+	}
+}
+
+struct Day {
+	vector <double> hour{ vector<double>(24,not_a_reading) };
+	//24시간을 포함하며 각 시간은 not_a_reading으로 초기화, 정수가 요소 타입으로 변환될 수 있는 경우 ( )사용하기
+	//단순 초기화 문법임 vector <double> hour(24,not_a_reading)이 더 직관적이며 이는 24개의 객체 생성 및 not_a_reading으로 초기화 하는 것이다.
+};
+
+struct Month {
+	int month{ not_a_month };
+	vector<Day>day{ 32 };
+};
+
+struct Year {
+	int year;
+	vector <Month> month{ 12 }; // [0:11] 1월은 0
+};
+
+// 대부분의 경우 32, 12등의 상수가 아닌 기호 상수 권장
+
+
+int month_to_int(string m) {
+	for (int i = 0; i < 12; i++)if (month_input_tb1[i] == m) return i;
+	return -1;
+}
+
+string int_to_month(int i) {
+	if (i < 0 || 12 <= i) error("잘못된 월별 인덱스");
+	return month_print_tb1[i];
+}
+
+struct Reading {
+	int day;
+	int hour;
+	double temperature;
+};
+
+bool is_valid(const Reading& r) {
+	if (r.day < 1 || 31 < r.day) return false;
+	if (r.hour < 0 || 23 < r.hour) return false;
+	if (r.temperature < implausible_min || implausible_max < r.temperature) return false;
+	return true;
+}
+
+//( 일 시각 온도) 형식으로 읽음
+istream& operator>>(istream& is, Reading& r) {  //참조로 r을 넘겨줌
+	char ch1;
+	if (is >> ch1 && ch1 != '(') { // 첫 입력 형식이 ( 가 아니면 fail() 상태
+		is.unget();
+		is.clear(ios_base::failbit);
+		return is;
+	}
+
+	char ch2;
+	int d;
+	int h;
+	double t;
+	is >> d >> h >> t >> ch2;
+	if (!is || ch2 != ')') error("잘못된 측정치"); 
+	//각 데이터형에 맞지 않는 입력 형식이 들어왔거나 ch2 가 ) 가 아니면 에러, 데이터를 어느정도 읽고나면 복구 어려우므로 에러 띄우고 종료
+	r.day = d;
+	r.hour = h;
+	r.temperature = t;
+	return is; 
+}
+
+istream& operator>>(istream& is, Month& m) 
+//{month feb...} 형식의 데이터 읽음
+{
+	char ch = 0;
+	if (is >> ch && ch != '{') {
+		is.unget();
+		is.clear(ios_base::failbit);
+		return is; // 객체(is) 의 상태(버퍼, 위치, 플래그 등)를 그대로 가진 채로 다음 연쇄 호출로 넘어감.
+	}
+
+	string month_marker;
+	string mm;
+	is >> month_marker >> mm;
+	if (!is || month_marker != "month")error("월간 데이터 시작 부분 오류");
+	//is가 문자열이 아닌 형식을 받으면 fail 상태가 되고 !is는 참이 됨
+	m.month = month_to_int(mm);
+
+	int duplicates = 0;
+	int invalids = 0;
+	for (Reading r; is >> r;) { //Reading 타입의 연산자 오버로딩을 작성해 확인 값 형식이 잘못되거나 eof시 종료
+		if (is_valid(r)) {
+			if (m.day[r.day].hour[r.hour] != not_a_reading)
+				++duplicates;
+			m.day[r.day].hour[r.hour] = r.temperature; // Month 구조체는 Day형 벡터를 가지며 Day 구조체는 hour를 가지므로 Month에 hour가 직접적으로 없어도 접근가능
+		}
+		else
+			++invalids;
+	}
+	if(invalids) error("월간 데이터가 유효하지 않은 측정치 포함");
+	if (duplicates) error("월간 데이터가 중복된 층적치 포함");
+	end_of_loop(is, '}', "월간 데이터 끝 부분 오류");
+	return is;
+}
+
+istream& operator>>(istream& is, Year& y)
+//{ year 1972 ..} 형식의 연간 측정치를 y에 읽음
+{
+	char ch;
+	is >> ch;
+	if (ch != '{') {
+		is.unget();
+		is.clear(ios_base::failbit);
+		return is;
+	}
+	string year_marker;
+	int yy;
+	is >> year_marker >> yy;
+	if (!is || year_marker != "year")error("연간 데이터 복사 오류");
+	y.year = yy;
+	while (true) {
+		Month m; // m을 초기화하지 않으면 이전 달의 측정치가 전부 포함됨
+		if (!(is >> m))break; // m을 읽는 연산자 오버로딩에서 m에 새로운 값을 할당하지 않고 Reading의 data를 추가하기만 하므로 for(Month m; is >> m;)은 틀림
+		y.month[m.month] = m;
+	}
+	/*또는
+	for(Month m; is >> m;){
+	y.month[m.month] = m;
+	m = Month{};
+	*/
+	end_of_loop(is, '}', "연간 데이터 끝 부분 오류");
+	return is;
+}
+
+void print_year(ostream& o,const Year& y) {
+	o << "year = " << y.year;
+	
+}
+
+int main() {
+	cout << "입력 파일 이름을 입력하세요:\n";
+	string iname;
+	cin >> iname;
+	ifstream ist { iname };
+	if (!ist)error("입력 파일 열기 실패");
+
+    ist.exceptions(ist.exceptions() | ios_base::badbit);
+
+	cout << "출력 파일 이름을 입력하세요:\n";
+	string oname;
+	cin >> oname;
+	ofstream ost{ oname };
+	if (!ost)error("출력 파일 열기 실패");
+
+	vector<Year> ys;
+	while (true) {
+		Year y;
+		if (!(ist >> y)) break;
+		ys.push_back(y);
+	}
+	cout << "연간 측정치 개수: " << ys.size() << "\n";
+	for (Year& y : ys)print_year(ost, y);
+
+}
