@@ -1,0 +1,50 @@
+const char number = '8';
+const char quit = 'q';
+const char print = ';';
+const string prompt = "> ";
+const string result = " ";
+const char name = 'a';
+const char let = 'L';
+const string declkey = "let"; 
+//상수 선언문, const는 초기값 필수
+
+
+int main()
+try {
+	int x; //이름은 알차벳(으로 시작) ,숫자 , _사용 가능 타입 정의 시 맨 앞 글자는 대문자가 좋음
+	cout << "값 입력\n";
+	cin >> x; // x에 값 대입
+	vector <int> v; //벡터 선언
+	v.push_back(x);//벡터 마지막에 값 추가
+	v.size(); //벡터 사이즈 반환
+	//벡터 관련
+	
+	string s1 = "abc";
+	string s2 = "def";
+	string s3 = "";
+	s3 = s1 + s2; //문자열 이어 붙임 , < > == 연산도 가능
+
+	int y = 4;
+	int z{ y };//축소 변환시 에러 발생
+	double w = double(y); //타입 변환 가능, {}사용시 축소변환 방지
+	// int x1 = narrow_cast<2.0>; 공식적으로는 없음 2.0이면 ok 2.9면 예외
+
+
+	if (!cin); // 읽을 자료가 없을시 실행, cin은 입력 스트림 객체로 내부에 버퍼 존재, 읽고 되돌리고 상태 확인 가능
+	
+
+	switch (y) { // 비교값은 정수 ,문자, 열거형만 문자열은 금지
+	case 1: //레이블 값은 상수로
+		//statement; -> 값 저장문 등이 존재 시 {}로 묶어줌
+		break;
+	case 2: case 3: case 4: // 여러 케이스 이어 붙이기
+		break;
+	default: //선택 가능
+		break;
+	}
+
+return 1;
+}
+catch (exception& e) { //예외 처리
+	cerr << e.what() << '\n';
+}

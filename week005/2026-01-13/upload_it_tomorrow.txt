@@ -1,0 +1,345 @@
+`define dp_width 32
+
+module ALU(READY, result, reset_b, clock, start, alu_ctr, data_a, data_b);
+parameter size = 6; //p의 범위는 32가 최대 6비트만 있으면 가능
+
+output [`dp_width * 2 - 1: 0] result;
+output reg READY = 0; //READY가 1이면 연산 가능 0이면 연산 중인 상태
+
+input reset_b, clock, start;
+input [2:0] alu_ctr;
+input [`dp_width-1 : 0] data_a, data_b;
+
+reg
+ADD = 0, 
+SUB = 0, 
+MULTI = 0, 
+AND = 0, 
+OR = 0, 
+XOR = 0, 
+LOAD = 0, 
+SHIFT = 0,
+DECR_P = 0, 
+FLAGW = 0,   //Frag 작성 제어 신호
+CONVERT = 0;  //제어 명령 0으로 초기화
+
+parameter s_idle = 3'b000, s1 = 3'b001, s2 = 3'b010, s3 = 3'b011, s4 = 3'b100;  //상태 파라미터 정의
+
+parameter 
+f0 = 3'b000, //add
+f1 = 3'b001, //sub
+f2 = 3'b010, //multi
+f3 = 3'b011, //and
+f4 = 3'b100, //or
+f5 = 3'b101; //xor  
+
+reg [2:0] state, next_state;
+reg [`dp_width-1: 0] B, AH, AL;  
+reg [size-1:0] P;
+reg carry_out, carry_in;
+reg FLAG_N, FLAG_Z, FLAG_C, FLAG_V; //순서대로 부호, 제로, 캐리, 오버플로우 플래그를 의미함
+//부호는 MSB로 제로는 결과가 0인지, 캐리는 마지막 비트에서 나오는 캐리 비트가 존재하는지 오버플로우는 오버플로우 발생 여부
+wire zero, al0;
+
+assign al0 = AL[0];
+assign zero = (P == 0); //카운터 P의 값이 0인가? 0이면 zero = 1 아니면 0
+assign result = (alu_ctr == f2) ? {AH, AL} : {{`dp_width{1'b0}}, AH}; 
+//곱셈일 때만 두 레지스터 모두 보여주고 나머지 연산은 결과값 위는 0으로 채움
+
+/////////////////////////////////
+//controller
+
+always @(posedge clock, negedge reset_b)
+if(!reset_b) state <= s_idle;
+else state <= next_state;
+
+always @(*) begin //모든 케이스에 대해 고려하지 않을 시 의도치 않은 래치 발생 가능 -> @(*)로 처리
+
+    next_state = s_idle; 
+    LOAD = 0; READY = 0; DECR_P = 0; ADD = 0; SHIFT = 0; SUB = 0; FLAGW = 0;
+    AND = 0; OR = 0; XOR = 0; MULTI = 0; CONVERT = 0;
+
+case(alu_ctr) //연산 종류 선택
+/////////////////////////////////////////////////////////////////
+f0: begin  //add기능/////////////////////////////////
+    case(state)  
+    s_idle: begin
+            READY = 1;
+            if(start) begin  next_state = s1; LOAD = 1; end 
+            else next_state = s_idle;
+            end
+
+    s1: begin 
+        DECR_P = 1; ADD = 1; next_state = s2; 
+        end
+    
+    s2:begin 
+       SHIFT = 1; if(zero) next_state = s3; else next_state = s1; 
+       end
+
+    s3: begin 
+        FLAGW = 1; next_state = s_idle; 
+        end
+
+    default:  // 마찬가지로 의도치 않은 래치 생성 방지를 위해 default값으로 나머지 경우 처리
+    next_state = s_idle;
+
+    endcase
+    end
+
+//////////////////////////////////////////////////////////////
+f1: begin //sub기능////////////////////////////////
+case(state) 
+    s_idle: begin
+        READY = 1;
+        if(start) begin LOAD = 1; next_state = s1; end
+        else next_state = s_idle;
+        end
+
+    s1: begin 
+        CONVERT = 1; next_state = s2; 
+        end
+
+    s2: begin 
+        DECR_P = 1; ADD = 1; next_state = s3; 
+        end
+
+    s3: begin 
+        SHIFT = 1; if(zero) next_state = s4; else next_state = s2; 
+        end
+    
+    s4: begin 
+        FLAGW = 1; next_state = s_idle; 
+end
+    default: next_state = s_idle;
+endcase
+end
+
+///////////////////////////////////////////////////////
+f2: begin //multi기능///////////////////////////
+case(state) 
+    
+s_idle: begin
+    READY = 1; 
+    if(start) begin next_state = s1; LOAD = 1; end 
+    else next_state = s_idle;
+end
+
+s1: begin
+DECR_P = 1; 
+if(al0) ADD = 1;
+next_state = s2;
+end
+
+s2: begin
+SHIFT = 1;
+if(zero) next_state = s3;
+else next_state = s1; 
+end
+
+s3: begin
+FLAGW = 1; next_state = s_idle;
+end
+
+default: next_state = s_idle;
+
+endcase
+end
+
+///////////////////////////////////
+f3: begin //bitwise and 
+
+case(state) 
+   
+
+s_idle: begin
+    READY = 1;
+    if(start) begin next_state = s1; LOAD = 1; end
+    else next_state = s_idle;
+end
+
+s1: begin 
+    AND = 1; next_state = s2;
+end
+
+s2: begin
+FLAGW = 1; next_state = s_idle;
+end
+
+default: next_state = s_idle;
+
+endcase
+end
+
+///////////////////////////////////
+f4: begin //bitwise or
+case(state) 
+
+s_idle: begin
+    READY = 1;
+    if(start) begin next_state = s1; LOAD = 1; end
+    else next_state = s_idle;
+end
+
+s1: begin 
+    OR = 1; next_state = s2;
+end
+
+s2: begin
+FLAGW = 1; next_state = s_idle;
+end
+
+default: next_state = s_idle;
+
+endcase
+end
+
+//////////////////////////////////////
+f5: begin //bitwise xor
+case(state) 
+
+
+s_idle: begin
+    READY = 1;
+    if(start) begin next_state = s1; LOAD = 1; end
+    else next_state = s_idle;
+end
+
+s1: begin 
+    XOR = 1; next_state = s2;
+end
+
+s2: begin
+FLAGW = 1; next_state = s_idle;
+end
+
+default: next_state = s_idle;
+
+endcase
+end
+endcase
+end
+
+
+//////////////////////////////////////
+//data_path /////////////////////////
+
+always @(posedge clock) begin
+case(alu_ctr)
+f0: begin //add
+    if(LOAD) begin 
+        P <= `dp_width; 
+        AL <= data_a; 
+        B <= data_b; 
+        carry_out <= 0; 
+        carry_in <= 0; 
+        AH <= 0;
+     end
+     if(DECR_P) P <= P - 1;
+     if(ADD) {carry_out, AH[`dp_width- P]} <= AL[`dp_width - P] + B[`dp_width - P] + carry_in;
+     if(SHIFT) {carry_out, carry_in} <=  {carry_out, carry_in} >> 1;
+     if(FLAGW) begin 
+        FLAG_N <= AH[`dp_width-1];
+        FLAG_Z <= (AH == 0);
+        FLAG_C <= carry_out;
+        FLAG_V <= carry_in ^ carry_out;
+     end
+end
+
+
+f1: begin  //sub
+if(LOAD) begin 
+        P <= `dp_width; 
+        AL <= data_a; 
+        B <= data_b; 
+        carry_out <= 0; 
+        carry_in <= 0; 
+        AH <= 0;
+end
+if(CONVERT)  begin B <= ~B; carry_in = 1; end
+if(DECR_P) P <= P - 1;
+if(ADD) {carry_out, AH[`dp_width - P]} <= AL[`dp_width - P] + B[`dp_width - P] + carry_in;
+if(SHIFT) {carry_out, carry_in} <= {carry_out, carry_in} >> 1; 
+// 마지막 오버플로우 플래그 처리를 위해
+//마지막 비트 자리로 들어가는 비트와 나오는 비트는 저장  -> 두 값이 다르면 오버플로우 발생한 것임
+
+if(FLAGW) begin 
+        FLAG_N <= AH[`dp_width-1];
+        FLAG_Z <= (AH == 0);
+        FLAG_C <= carry_out;
+        FLAG_V <= carry_in ^ carry_out;
+     end
+end
+
+
+f2: begin //multi
+    if(LOAD) begin AL <= data_a; AH <= 0; B <= data_b; P <= `dp_width; carry_in <= 0; carry_out <= 0;
+    end
+    if(DECR_P) P <= P - 1;
+    if(ADD) {carry_in, AH} <= B + AH;
+    if(SHIFT) {carry_in, AH, AL} <= {carry_in, AH, AL} >> 1;
+    if(FLAGW) begin FLAG_N <= AH[`dp_width-1]; FLAG_Z <= ({AH + AL} == 0); FLAG_C <= 0; FLAG_V <= 0; end
+    
+end
+
+
+f3: begin  //bitwise and
+if(LOAD) begin AL <= data_a; B <= data_b; AH <= 0; end
+if(AND) AH <= AL & B;
+if(FLAGW) begin FLAG_N <= 0; FLAG_C <= 0; FLAG_V <= 0; FLAG_Z <= 0; end
+//정상적으로는 FLAGW 명령어가 실행되지는 않음
+end
+
+f4: begin
+    if(LOAD) begin AL <= data_a; B <= data_b; AH <= 0; end
+    if(OR) AH <= AL | B;
+    if(FLAGW) begin FLAG_N <= 0; FLAG_C <= 0; FLAG_V <= 0; FLAG_Z <= 0; end
+end
+
+f5: begin
+    if(LOAD) begin  AL <= data_a; B <= data_b; AH <= 0; end
+    if(XOR) AH <= AL ^ B;
+    if(FLAGW) begin FLAG_N <= 0; FLAG_C <= 0; FLAG_V <= 0; FLAG_Z <= 0; end
+end
+
+endcase
+end
+
+endmodule
+
+
+module tb_alu;
+wire [2 * `dp_width -1: 0] RESULT;
+wire READY;
+reg RESET_B, CLOCK, START;
+reg [2:0] ALU_CTR;
+reg [`dp_width-1 :0] DATA_A, DATA_B;
+
+ALU m1 (READY, RESULT, RESET_B, CLOCK, START, ALU_CTR, DATA_A, DATA_B);
+
+initial begin
+$dumpfile("test.vcd");
+$dumpvars(0, tb_alu);
+end
+
+initial begin
+CLOCK = 0;
+forever #3 CLOCK = ~CLOCK;
+end
+
+initial begin
+DATA_A = 10'b01_1111_0011; 
+DATA_B = 10'b01_0000_0011;
+START = 0;
+for(ALU_CTR = 0; ALU_CTR <= 5; ALU_CTR = ALU_CTR + 1) begin
+    #4 START = 1;
+    #6 START = 0; // 한 클럭 펄스
+    wait(READY); // READY=1 될 때까지 기다림
+    #1 $display("RESULT=%d A:%d B:%d ", RESULT, DATA_A, DATA_B);
+    $display("RESULT:%b A:%b B:%b", RESULT, DATA_A, DATA_B);
+end
+#100 $finish;
+end
+
+endmodule;
+// 내일 ASMD차트 + 결과창(확인 쉽게 하기 위해 10비트로 낮췄었음) + gtkwave파형 그리기

@@ -1,0 +1,44 @@
+logic => reg + 넷이랑 비슷  / multi structural driver에 의한 구동은 net 데이터 형 사용
+전부 logic으로 작성 후 컴파일 에러시에만 바꿔도 좋음
+
+2-state data types 
+0, 1만 가지며 x,z값이 있을 경우 자동으로 변환하므로 주의 필요
+shortint longint, integer, byte, bit등이 있으며 기본적으로 signed임 $isunknown(변수) -> x,z면 1 반환
+
+어레이 연산 종류 -----
+%p 는 배열, 구조체, 클래스 등의 값을 보여줌
+foreach(array[i]) => array 요소 전부 순환 이차원일 경우 foreach(array[i,j]) 값은 array[i][j] 로 접근 f[x:y] foreach(f[i]) => x~y까지 for문과 비슷
+초기값 + 선언을 같이 할 경우 initial block안에서 static 키워드랑 같이
+  copy(사이즈 같을 경우만), compare가능
+  src[0] = 'b101 -> src[0][2:1] = 'b10 등으로 접근도 가능
+  bit [3:0][7:0] packed일 경우 빈 공간이 존재 앞의 선언은 unpacked로 32비트에 붙여서 저장
+  ->스칼라 값 변경시 packed가 유용하며 @안에는 스칼라값, packed 배열에서 합법임
+
+  배열 종류-----
+  fixed size array
+  array[4] = '{a,b,c,d};
+[8] => [0:7]로 해석됨, 범위 초과시 4state는 x, 2state는 0 반환 보통 32비트를 워드로 잡음
+
+dynamic array
+  array[] = '{a,b,c,d};
+  array[]; array = new[n]으로 n개 요소 할당 new[n](배열1)이면 배열 1이 값도 같이 복사, 배열.delete으로 요소 삭제
+
+queue
+q[$] = {a,b,c,d}; 로 값 설정 가능 ('가 없음)
+q[0:$] 최대 인덱스 범위까지 [$:9] 0~9까지 q.insert(1,x) 첫번째 요소 앞에 x 삽입, q.delete(1): 1 삭제, q.push/pop_back/front(push면 value) dynamic array, fixed array 삽입 가능, 큐는 불가
+
+associate array : 매우 큰 공간을 다룰 수 있으며 문자열로도 주소 다루기 가능함
+
+array methods
+1. array reduction => b.sum(), b.product(), b.and(), b.or(), b.xor() 등
+랜덤 요소는 $urandom_range(array.size()-1)// queue, aynamic array $urandom_range($size(array)-1)// fixed array, queues, dynamic array, associate array 등으로 접근 가능
+
+2.array locator
+d.find_(index/ first/ first_index/ last/ last_index) with(조건) 조건 예시 item == 4 등
+index는 int형 반환 
+bit one[6]; foreach(one[i]) one[i] = i // 0 또는 1 , one.sum() = (1+0+1+0+1+0) & 1 = 1 형태, one.sum() with (int'(item)) = > 3
+
+3.array sorting, ordering -> 실제로 배열 변경, dynamic/fixed array, queue만 가능
+  d.reverse(), d.sort(), d.rsort(), d.shuffle() 등
+  struct packed {bit[7:0] r, g, b} c[]
+  c.sort() with (item.r) -> r로 정렬 // c.sort(x) with ({x.g, x.b}) g로 1차 b로 2차 정렬

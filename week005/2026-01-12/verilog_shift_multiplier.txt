@@ -1,0 +1,45 @@
+module sequential_binary_multiplier(product, ready, multiplicand, multiplier, start, clock, reset_b);
+parameter dp_width = 5, psize = 3;
+parameter s_idle = 2'b00, s_add = 2'b01, s_shift = 2'b10;
+
+output [dp_width*2 -1 : 0] product;
+output ready;
+input [dp_width -1: 0]multiplicand, multiplier;
+input start, clock, reset_b;
+
+reg [dp_width-1: 0] a,b, q;
+reg c;
+reg [psize-1:0] p;
+reg load_legs, decr_p, add_reg, shift_reg;
+reg [1:0]state, next_state;
+
+assign product = {a,q};
+wire zero = (p == 0);
+wire ready = (state == s_idle);
+
+// control unit
+always @(posedge clock, negedge reset_b)
+if(!reset_b)state <= s_idle;
+else state <= next_state;
+
+always @(state, start, q[0], zero)begin
+    next_state = s_idle;
+    load_legs = 0;
+    decr_p = 0;
+    add_reg = 0;
+    shift_reg = 0;
+    case(state) 
+    s_idle: if(start)begin load_legs = 1; next_state = s_add; end
+    s_add: begin decr_p = 1; if(q[0]) add_reg = 1; next_state = s_shift; end
+    s_shift: begin shift_reg = 1; if(zero) next_state = s_idle else next_state = s_add; end
+    endcase
+end
+
+//data_path_unit
+always @(posedge clock)begin
+if(load_legs) begin p <= dp_width; a <= 0; c <=0; b<=multiplicand; q<=multiplier; end
+if(add_reg) {c, a} <= a + b;
+if(shift_reg) {c,a,q} <= {c,a,q} >> 1;
+if(decr_p) p <= p-1;
+end
+endmodule;
