@@ -1,0 +1,31 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include <stdlib.h>
+
+
+int main() {
+	printf("x  y  || x&y   x|y   xy`+x`y  xy+x`y`  ~x   ~(x&y)    ~(x|y)\n");
+	printf("------------------------------------------------------------------\n");
+	for (int x = 0; x <= 1; x++) {
+		for (int y = 0; y <= 1; y++) {
+			printf("%d  %d  ||  %d    %d        %d      %d        %d     %d         %d\n", x, y, x & y, x | y, x ^ y, (x&y)|(x^1&y^1), (x^1),  (x&y)^1,   (x|y)^1);
+		}
+	}
+	printf("------------------------------------------------------------------\n\n");
+
+	printf("even parity generator + checker(no error case)");
+	printf("x  y  z  P(parity-bit)    C(parity checking)\n");
+	for (int i = 0; i < 8; i++) {
+		int x = 1 & (i>>2);
+		int y = 1 & (i>>1);
+		int z = 1 & (i>>0); // (i>>0) => i로 적어도 됨
+		int P = x ^ y ^ z;
+		int C = x ^ y ^ z ^ P;
+		//식 자체는 맞음 
+		//그러나 P = x^y^z
+		//=> XOR 성질 x^x = 0에 의해 항상 0으로만 나옴 
+		//=> x,y,z,P 중 하나라도 반전이 되면 C = 1이 됨 -> 즉 단일 비트 오류 검출 가능함
+		printf("%d %d %d        %d                 %d\n", x, y, z, P, C);
+	}
+}
+
