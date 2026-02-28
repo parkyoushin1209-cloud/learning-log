@@ -1,0 +1,115 @@
+시퀀스의 엔드포인트는 과거 이벤트 참조시 유용함
+
+sequence qReq;
+@(posedge clk) $rose(req) ##3 `true;
+endsequence
+
+aPIfAckThenPreviousRequest : assert property(
+    @(posedge clk) $rose(ack) |-> qReq.triggered; //새 ack가 활성화되면 req가 3사이클 전 활성화 됐어야 함 다음과 같이 표현도 가능
+    //$rose(req) |-> ##3 $rose(ack);
+    //$rose(ack) |-> $past(req, 3);
+)
+
+.triggered는 프로퍼티의 레벨 민감 제어로 사용되거나 시퀀스 종료의 결과로서 절차적 코드에 사용될 수 있음
+1. 절차적 코드의 실행을 시퀀스가 종료할 때까지 지연
+wait(seq_inst.triggered)
+2. 시퀀스의 종료에 기반한 프로퍼티 무효화
+disable iff(seq_inst.triggered)
+
+시퀀스 인스턴스는 절차적 코드에서 이벤트 감지 등의 사용가능
+//프로세스가 명시된 시퀀스가 성공적으로 end point에 도달할 때까지 block 됨
+
+이벤트 타입의 형식 인자
+sequence q_e(event e); // 이벤트가 시퀀스 선언에 형식 인자로 있음 이 경우 다음을 실인자로 사용 가능
+event_expr::=
+[edge_identifier] expr [iff expr]
+seq_inst[iff expr]
+event_expr or event_expr
+event_expr, event_expr
+(event_expr)
+
+untype 형식 인자
+시퀀스 선언의 포트리스트데 타입이 없음 -> untyped (기본 타입 지정은 없음)
+형식 인자 리스트에 올 수 있는 타입 = 어써션 표현식의 피연산자로 가능한 타입 + untyped
+데이터 타입 뒤에 오는 형식 인자가 untyped면 명시적으로 untyped를 적어야 함
+$가 실인자라면 untype를 형식인자로 사용해야 함
+$에 대한 참조는 지연 범위 상한값 또는 named_seq_inst의 실인자여야 함
+실인자는 {}로 묶여 형식인자로 매핑
+실인자는 치환 전 자신의 self-determined type으로 형변환 됨// untype가 호출된 곳에서 사용된 타입에 따라 직접 결정
+실인자가 elaboration time 상수일 때는 형식 인자를 지연 범위 명시에도 사용 가능
+매핑 후 결과 시퀀스는 유효해야 함 // 반복 범위를 나타내는 칸에 시퀀스가 들어가는 등은 유효하지 않을 수 있음
+
+시퀀스 타입의 형식 인자
+형식인자가 sequence 타입이라면 실인자는 다음의 것들이 가능함
+seq_inst
+seq_expr
+Boolean_expr
+.triggered, .matched를 사용한 시퀀스의 end point
+시퀀스 타입의 형식인자 참조는 seq_expr이 합법인 곳 또는 triggered/matched의 operand에 둘 수 있음
+
+bit clk, clk2, b=1, c=1, d=1, e=1, f=1;
+default clocking cb_clk @(posedge clk);endclocking
+sequence q_untyped(w, y); @(posedge clk) w ##2 y; endsequence
+sequence q_seq(logic w, sequence q); @(posedge clk)  w ##2 q; endsequence
+
+q_seq(e, q_untyped(a,b)) // seq_inst
+q_seq(e, a ##2 b) // seq_expr
+q_seq(e, b||c) // boolean_expr
+q_seq(e, q_untyped.triggered(or .matched)) // trriger, matched -> 여기에는 seq_inst가 와야하며 seq_expr은 올 수 없음
+
+
+====================================
+Data types for typed formal arguments
+expr의 평가 결과는 불린이며 절차적 if문 조건에서 해석되는 expr과 같은 방식으로 해석됨
+// x,z,0 이면 false 이외에는 true
+
+동시 어써션에서 사용하는 표현식은 정수 타입과 호환되는 결과를 내놓아야 함
+(부분 표현은 전체 표현이 이 규칙을 만족하는 한 이 규칙을 지킬 필요는 없음)
+
+다음 타입들은 형식인자로 사용되거나 동시 어써션에 적용 가능(단, 결과 expr의 평가 결과는 불린 값을 반환해야 함)
+enum, byte, shortint, int, longint, integer, time, bit, logic, reg, shortreal, real, realtime, signed, unsigned
+
+typedef enum {BK_RED, BK_GREEN, BK_BLUE} color_e;
+color_e color;
+bit clk, a, b, r, d;
+real r = 2.1, y = 10.0;
+realtime rtime;
+time t;
+logic[31:0] rdata;
+assert property(r == y);
+assert property(($realtime - rtime) > 10.2);
+assert property(($time - t) > 10ns);
+assert property(rdata == 32'hFFFF0000);
+assert property(color == BK_BLUE);
+
+어써션 평가에서 샘플링 되는 다이나믹 배열, 큐, 연관배열의 요소들은 평가되기 전에 배열에서 제외되거나 resize될 수 있으나
+어써션 평가가 완료될 때까지 어써션의 범위 내에서 계속 존재해야 함
+
+절차적 동시 어써션 내의 표현식은 원칙적으로 자동 변수를 참조할 수 없음
+자동 변수, 지역 변수, active free checker 변수의 샘플된 값은 그들의 현재 값임( preponed 리전이 아닌 active리전에서 평가됨)
+
+
+module autom;
+bit clk, a, b, rd; // 정적 변수 선언
+//automatic bit k, z; // 불법적 선언
+logic[31:0] wdata, foo = 32'hFFFFFFFA. bar = 32'hFFFFFFFB;
+int m, n, w;
+initial forever #10 clk = !clk;
+default clocking cb_clk @(posedge clk);endclocking
+
+always @(posedge clk) begin : alw_foo
+automatic logic k=1'b0; // active 리전에서 평가
+static logic m = 1'b1; // preponed 리전에서 평가
+// k <= !k; 논블로킹 할당은 자동 변수에 올 수 없음
+k = !k; // 어써션이 아니므로 문제 없이 동작
+for(int i=0; i< 10 ; i++) // 루프에 선언된 변수 i는 자동 변수
+a4: assert property(foo[i] && bar[i]);
+/*  규칙상 동시 어써션이 자동 변수를 참조할 수 없음
+어써션 평가 시점에 i는 이미 10일 수 있음
+automatic 대신 generate를 사용하면 컴파일 타임에 어써션을 개별적으로 생성하고 preponed 리전에서 안정적 샘플이 가능함*/
+ap_k : assert property(k);
+/*  assert 뒤에 property가 붙으면 동시 어써션으로 봄
+어써션은 observed 리전에서 평가되는 자동변수는 active리전에서 생성되고 값이 바뀜
+=> 어써션이 k를 보려할 때 이미 사라지거나 원치 않는 시퀀스 값일 수 있음*/
+end
+endmodule
