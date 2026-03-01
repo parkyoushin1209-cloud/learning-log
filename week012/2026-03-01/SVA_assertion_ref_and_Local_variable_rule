@@ -1,0 +1,152 @@
+규칙 : 동시 어써션 내 표현식은 자동변수를 참조하면 안됨
+v = 자동 함수(invert_auto) 내 선언된 자동 변수, 함수(invert_static) 내 선언된 static 변수
+assert property(a |-> invert_auto.v == a) // 자동 함수 내 아이템 v로 계층적 접근은 허용 안됨
+assert property(invert_static.v == m) // ok
+
+규칙
+변수가 정적이면 initial, always 절차 시작 전 초기화가 수행돼야 함
+초기화는 변수가 입력된 문맥에서 언제나 다시 수행되지는 않음
+정적 태스크, 함수 또는 절차적 블록에서 선언된 변수는 기본적으로 정적 수명과 지연 범위를 가진다.
+초기화가 시뮬레이션 시작 때 한번만 수행된다는 유저의 의도를 나타내기 위해 명시적 static 키워드 사용 가능
+자동변수 선언이 불법인 곳에서 static 키워드 사용은 선택적임
+
+규칙 : 표현식은 non-static 형식의 클래스 프로퍼티/메서드를 참조하면 안됨 // static은 가능
+static int i, a; in c2 extends c_virtual
+int k = 5;   in c2         
+rand int j = 4;  in c_bfm
+assert property(
+ c2.a |-> c2.i == i  // ok
+c_bfm.j == 0 // 불법 참조
+c2.k == 5 //불법 참조
+
+규칙 : 표현식은 chandle 데이터 타입을 참조하면 안됨
+
+규칙 : 표현식 내 함수는 output, ref인자를 포함하면 안됨 // const ref는 예외
+함수는 자동(또는 상태 정보를 보존하지 않음)이고 부작용을 가지지 않아야 함
+
+logic[0:7] ckk;
+function logic[0:7] edac_with_side_effects(ref logic[0:31] dataout); // 자동이 아니며 ref 인자를 가졌음
+logic[0:7] checkout;
+....
+ckk[0] = checkout[0]; //부작용
+endfunction
+
+규칙 형식인자가 기본 실인자를 가질 수 있고 이 경우 시퀀스 인스턴스의 포트리스트에서 생략 가능함
+
+형식 인자와 시퀀스/프로퍼티 선언 내 지역 변수=====================================
+
+SVA는 동적으로 생성된 변수를 시퀀스/프로퍼티에 대해 지역적으로 선언 가능
+asserted property 각각의 성공적 시도를 위해 이런 지역 변수의 복사본들을 허용함 // 지역 변수는 스레드마다 복사본 허용, nonlocal이면 공유해버림
+지연변수는 초기화되거나 할당(재할당) 가능하며 다른 expr에 작동하거나 비교될 수 있음
+복잡한 시퀀스/프로퍼티는 자주 간단한 시퀀스/프로퍼티로 구성됨 => 시퀀스/프로퍼티 사이 지역 변수 상호 연결 필요
+
+규칙 지역 변수가 선언될 수 있는 두 위치는
+1. 프로퍼티/시퀀스의 어써션 변수 선언 섹션
+2. 형식 인자로서 시퀀스/프로퍼티의 포트 리스트
+이 때 local, untyped 인자는 형식 변수 인자로 취급된다.
+
+규칙: 일반적으로 지역 변수 형식 인자는 어써션 변수 선언에서 생성되며 지역 변수와 같은 방식으로 동작
+
+규칙: non-local 형식인자는 기본적으로 input 방향이고 기본 값을 가질 수 있음
+non-local에 쓰기를 실행할 경우 지역 변수로 여겨지지 않음, preponed에서 샘플
+
+규칙:
+지역 변수 형식 인자는 시퀀스/프로퍼티의 지역 변수처럼 동작
+시퀀스 선언에서 방향이 inout/output일 때만 내보낼 수 있음
+untyped 형식 인자는 타입 방향을 가질 수 없음 // 시퀀스/프로퍼티에서 어떻게 사용되는지에 따라 input/output방향을 가지는 지역 형식 변수로 취급 사능
+사용되는 시퀀스/프로퍼티의 몸체에서 값이 할당되지 않을 경우 untype 형식인자는 non-local 형식인자로도 취급 가능
+
+규칙: 지역 형식 인자로는 결과 식이 정수 타입과 호환되는 타입으로 캐스팅되어 사용가능한 어떤 타입도 가능함
+int, bit, byte, vector, shortreal, real, realtime, packed array/structure/union, dynamic array, queue, associative array, enum 이 가능
+
+
+지역 변수 사용 규칙 (FA = 형식 인자, MT = empty, AVD = 어써션 변수 선언, LV : 로컬 변수)
+1. 
+합법적 지역 변수 타입 = bit, logic, reg, byte, struct, enum, shortint, int, longint, integer, time, shortreal, real, realtime, string, associate array, dynamic array, queue
+형식 인자에서 추가적 합법 타입 = untyped
+LV가 아닌 FA = sequence, event
+// 로컬 변수로 설계된 typed FA는 local로 선언해야 함, untyped 형식 인자는 실인자의 타입을 상속함
+
+2. 불법적 타입 = chandle, class 
+
+3. 초기화
+FA는 AVD변수보다 먼저 초기화 됨 // LV FA는 방향 명시 안되어있으면 input으로 취급
+nonlocal 변수로 초기화된 LV는 nonlocal 변수의 preponed 값 사용
+초기화된 지역 변수는 이전에 초기화된 변수 참조 가능
+초기화되지 않은 지역 변수는 할당되지 않고 기본 값을 가지지 않음
+
+4. LV 할당
+sequence_matched_item_list ()에서 할당되며
+괄호에서 , 분리 이용
+나타나는 순으로 할당되며
+모듈변수의 경우 함수 호출 및 또는 액션 블록을 통해 값 할당 // 프로퍼티 내에서 할당 불가
+
+5. MT 매치에서 지역 변수 할당은 불법
+a ##1 (b[*0:1], v_addr = 0) // 불법 b[*0:1]은 empty 매치를 가짐
+(a ##1 b[*0:1], v_addr = 0) // a ##1 b[*0:1]은 MT매치 아님
+
+6. 읽기 전 쓰기
+LV는 읽히기 전 반드시 값을 가지고 있어야 함
+
+7. input 방향 LV는 시퀀스 종료시 할당되지 않고 내보내지지 않음
+sequence q_t(local input int lv_d);
+...
+(a, lv_d = 10) ##1 (b,v_a);
+endsequence
+int v = 0;
+q_t(v) ##1 v == 10; // v는 10이 아님
+
+8. 반복에서 LV 할당
+반복 횟수는 상수값이거나 상수 범위 또는 $여야 함
+
+9.
+LV는 사용자 정의/지연을 위한 카운터로서 사용 가능
+LVs나 변수는 일시적 범위의 end point에서 쓸 수 없음
+local int v_count;
+##[1:v_count] <- 사용 불가
+
+10. AVD 내 지역 변수는 선언된 시퀀스/프로퍼티에만 지역적
+=> 서로 다른 시퀀스라면 지역 변수를 못 봄
+
+11. sequence의 인스턴스로 지역변수 전달 및 바인딩 방법
+1. untyped FA LV 사용
+2.  typed FA LV 사용
+3. .triggered 사용
+
+a: sequence q1(lv1); c ##2
+(a, lv1 = data); endsequence
+
+sequence q2; int v_dt;
+b ##1 q1(v_dt) ##1 v_dt == dt;
+endsequence
+
+:. sequence q1(local output int lv1);
+나머지 동일 
+
+c: 시퀀스 1 동일 
+sequence q2; int v_dt;
+b ##1 q1(v_dt).triggered q1은 b 시작 전 먼저 시작했음
+
+12. LV에서 or, and, intersect
+지역 변수에 대해 ORing할 경우 로컬 변수가 복사된 2개의 스레드 생성 이때 LV가 읽히기 전 값을 가져야 함
+ANDing 할 경우 양쪽 스레드에서 같은 변수에 동시에 작성하면 안됨 
+
+13. LV는 1회 이상도 업데이트 가능 = 재할당에 제한 없음
+
+14. LV FA 식별자와 AVD에서의 식별자는 달라야 함
+
+15. 형식/실인자
+a. 형식이 시퀀스 타입이라면 실인자는  seq_expr이어야 함
+b. 형식이 이벤트 타입이라면 실인자는 event_expr이어야 함
+c. 형식이 untyped면 실인자의 형식을 상속 받음
+d. FA가 범위 참조면 타입은 shortint, int, longint여야 함(untyped는 추론됨)
+sequence q_r(max, int t);
+a ##[0:max] b ##[1:t] c;
+
+16 LV FA의 초기화
+input 타입 LV FA만 초기화 가능 // 방향 명시 안된채 초기화가 있다면 input으로 추론
+local이면 event 타입 불가 / non-local은 가능
+output 방향 LV FA는 초기화 불가
+property에서 방향으로 inout/output은 못 옴
+
+17. LV FA의 초기화는 AVD의 할당 및 초기화에 앞서 만들어짐
