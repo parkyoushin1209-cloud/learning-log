@@ -1,0 +1,101 @@
+Using the UVM Library
+UVM 라이브러리 사용을 위해 다음이 필요
+UVM 패키지 탑 파일, DPI파일 컴파일(uvm_pkg.sv, uvm_dpi.cc)
+원하는 범위로 uvm_pkg import
+UVM 매크로 포함
+
+UVM 라이브러리 사용 가이드 라인
+-이름 충돌을 방지하기 위해 uvm_pkg를 전역 범위로 import하는 것을 피하자 // 어떤 패키지도 마찬가지
+-top uvm 파일은 전형적으로 다음과 같이 둘러싸임
+`ifndef <FILE_NAME>_SVH
+`define <FILE_NAME>_SVH
+..body of the file
+`endif
+//이는 여러 장소로부터 UVM 라이브러리 포함을 허용하고 파일은 한 번만 컴파일해 여러번 선언을 피한다. 
+user's UVC 파일에 사용 추천
+
+라이브러리 베이스 클래스
+미리 정의된 필드 메서드 제공으로 균일성을 제공해 재사용성을 높여줌
+
+ The uvm_object class =====================================
+추상적 uvm_object는 모든 UVM Class의 기반 클래스
+주요 역할 = create/copy/pack/unpack/compare/print/record 같은 공통 오퍼레이션을 위한 메서드 집합 정의 및 자동화
+여기서 파생된 클래스는 create(), get_type_name() 같은 순수 가상함수를 반드시 구현해야 함
+
+많은 데이터 아이템이 print, copy, compare, pack, unpack, 다른 유틸리티 함수들을 요구함
+시그니처 정의를 위해서는 시그니처와 동작들을 배워야 하나
+uvm_object base class가 이런 시그니처를 정의해줌
+TB 내 모든 객체는 uvm_object에서 직간접적으로 파생돼야함
+UVM SV class library는 자동으로 print/copy/clone/compare/pack/unpack 메서드 및 그외를 구현하는 매크로를 포함함
+
+uvm_object로부터 확장된 클래스에 대해 생성자는 의무가 아니지만 일관성을 위해 사용 추천
+생성자 사용시 선택적 기본 name 값과 name 인자를 명시해야 함
+
+
+UVM 객체 유틸리티와 필드 자동화
+`uvm_object_utils_begin(TYPE), `uvm_object_utils_end 매크로는 uvm object를 위해 선언된 공통 오퍼레이션 정의에 사용됨
+get_type_name() : 객체 이름을 문자열로 반환, 구현
+create() : 생성자를 호출해 명시된 타입의 객체 할당, 구현
+factory에 TYPE을 등록해 TB 어디서나 오버라이드 될 수 있게함
+팩토리 연산에 필요한 static get_type() 구현
+이미 할당된 객체의 타입을 반환하는 uvm_object_type() 구현
+
+uvm 자동화 매크로 `uvm_field_* 매크로는 
+객체의 필드를 위한 print()/copy()/clone()/pack()/unpack()/compare()/record() 메서드 구현을 제공함
+자동화는 중첩된 객체, 유저 맞춤 설정을 지원함
+팩토리를 위한 필드의 자동 설정도 구현 // 팩토리 오버라이드 상황에서도 필드를 자동으로 복사/설정해줌
+
+문법 `uvm_field_*(field_name, flags)
+
+UVM 객체 및 필드 자동화 가이드라인
+-데이터 아이템을 uvm_sequence_item에서 파생하는 게 바람직함 => 그 아이템 클래스에 필드를 추가하지만 uvm_sequence의 부분으로서 클래스의 랜덤화를 허용함
+UVM_ALL_ON 대시 UVM_DEFAULT를 모든 `uvm_field_* 매크로에 대한 flag인자로 사용해라
+=> 모든 자동화 (copy, compare..)를 가능하게 하는 전력 파라미터
+다른 플래그는 원하지 않는 자동화 제거를 위해 사용됨
+`uvm_filed_int(transmit_delay, UVM_DEFAULT | UVM_NOPACK | UVM_NOCOMPARE (예시)
+transmit_delay는 필드명
+
+-생성인자에서 클래스 이름을 기본 값으로 설정
+function new(string name = "apb_transfer");
+
+-모든 생성자 선언의 처음으로 super.new(name)호출하기 // uvm_object 클래스의 생성자 호출을 보장함
+-타입 파라미터를 가지는 클래스를 위한 다른 매크로 `uvm_object_param_utils*
+// non-parameterized 버전과 같은 일을 하지만 문자열 기반 팩토리에 타입등록 안 함(여전히 타입 기반 접근을 위해 등록됨)
+`uvm_field_object는 기본적으로 deep operation 수행
+// 다른 객체의 참조 이용시 deep operation이 수행되지 않도록 하고 싶다면 플래그에 UVM_REFERENCE 사용
+
+매크로는 어떤 사용자 정의, 미리 정의된 프린터와도 함께 작동할 print 기능을 구현함
+pre_defined printer => table, tree, line
+Default table format : my_xfer.print() or my_xfer.print(uvm_default_table_printer) 형식으로 사용
+name               type                                   size                      value        // table 출력 형ㅅㅣㄱ
+====================================================
+my_xfer    apb_transfer                           -                          @560
+addr               integral                              32                      'hb2cbb864
+data               integral                               32                      'heba598d7
+direction   apb_direction_enum            1                        APB_WRITE
+transmit_delay     integral                        32                          'h6
+
+
+Default tree format : my_xfer.print(uvm_default_tree_printer
+my_xfer : (apb_transfer@560){
+addr : 'hb2cbb864
+data : 'hcba598d7
+......
+} 
+
+Default line format : my_xfer.print(uvm_default_line_printer)
+my_xfer : (apb_transfer@560) { addr : '......}
+
+field 자동화 매크로는 형식화된 display문에 쓰일 수 있는 문자열을 반환하는 sprint() 메서드를 구현함
+// 커스터마이즈 가능
+//table printer 소스 코드는 복잡 -> 런타임에 가장 비쌈
+많은 수의 트랜잭션 출력시 tree 형식이 좋음
+table 형식은 아무것도 명시 안 했을 때 사용되는 기본 형식
+탑레벨 모듈에서 기본 프린터 변경 가능
+
+//in my top-module
+import uvm_pkg::*;
+initial begin
+uvm_default_print = uvm_default_tree_printer;
+run_test();
+end
