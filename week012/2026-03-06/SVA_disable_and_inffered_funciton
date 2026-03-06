@@ -31,4 +31,13 @@ default disable 은 다음의 규칙을 가짐
 
 클럭과 무효화를 위해 추론된 함수
 $inffered_clock = 추론된 클럭의 표현식 반환 // 호출된 포인트로 클럭의 흐름 규칙을 적용해 얻어짐
-$inffered_disable = 추론된 무효화 표현식 반
+$inffered_disable = 추론된 무효화 표현식 반환
+
+추론된 함수는 프로퍼티 또는 시퀀스 선언의 FA 의 실인자로만 쓰일 수 있으며 몸체에는 못 옴
+두 함수는 디폴트 명시문을 포함하는 범위 내에서만 유효
+//모듈, 인터페이스, 체커, 프로그램 이들은 또다른 이들을 포함하고 있을 수 있음
+디폴트가 없을 때 $inffered_disable 호출시 1'b0 반환
+
+
+함축 연산자는 seq_expr |-> 또는 |=> property_expr 형식(property_expr는 seq_expr |=> property_expr로 다시 전개 가능)
+지연을 명확히 표시하기 위해서는 |-> 사용이 더 좋음
