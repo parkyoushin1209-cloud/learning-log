@@ -49,7 +49,7 @@ s_eventually p = not(always(not p))
 eventally[m:m] p = nexttime[m] p
 eventually[m:n] p = eventually[m:n-1] p or nexttime[n] p
 
-전부다 공허하지 않기 위해서는
+각각 공허하지 않기 위해서는
 1. 충분한 클럭 이벤트 존재
 2. 가장 먼저 매치되는 expr이 공허하지 않아야 함
 
@@ -81,10 +81,10 @@ accept_on(expr_or_dist) property_expr 형태며 expr_or_dist가 abort condition
 sync는 동기적 일반은 비동기적 동기적 강제 종료 조건은 프로퍼티의 preponed 샘플링 리전에서 샘플됨
 
 어떤 abort의 연산자의 중첩도 허용
--가장 외부를 먼저
+-가장 외부를 먼저(L->R)
 LV 참조 불가 시퀀스 메서드 triggerd, matched 포함 불가
 
-accept_in이 LV에 의존하게 만들 때 가장 많이 쓰이는 방법은 LV를 모듈 범수로 복사임
+accept_in이 LV에 의존하게 만들 때 가장 많이 쓰이는 방법은 LV를 모듈 범수로 복사임 //코드 확인
 함수를 만들고 시퀀스 매치 아이템에서 변수 업데이트 필요
 함수를 호출할 경우 멀티 스레드의 충돌을 방지할 수 있도록 추가 변수로 값 설정 후 막아주기
 sync_accpet_in이 참이면 action block실행 안될 수도 있으므로 $assertpasson(0) 사용
@@ -94,7 +94,51 @@ property_expr이 공허하지 않으며  평가 시도의 어떤 타임 스텝�
 
 
 
+import uvm_pkg::*;
+`include "uvm_macros.sv"
 
+module saccept;
+bit clk, enable_out, go = 1;
+int in1, erase, out1, save = -1;
+initial forever #10 clk = !clk;
+function void set_save(int v, bit b); // 모듈 변수 업데이트
+save = v;
+go = b; // 어써션 ENABLE FLAG, 1일때만 어써션 실행 가능, 멀티 스레드의 값 충돌 방지
+endfunction
+
+//일반 always문에서 값 업데이트시 : clk상승 -> 어써션 평가 -> always문 -> save 업데이트
+//seq_match_item : clk상승 -> seq_match_item -> set_save -> save 업데이트 -> 어써션 계속 평가
+property p1;
+int in_save;
+sync_accept_on(erase == save)
+(go && in1 != 0, in_save = in1, set_save(in_save, 1'b0)) |->  //시퀀스 매치 아이템에서 함수를 호출해 업데이트가 바로 적용됨
+##1 enable_out[->3] ##0 out1 == in_save;
+endproperty
+ap1 : assert property(@(posdege clk) p1) set_save(-1, 1'b0); else set_save(-1, 1'b0); 
+
+property p1b;
+int in_save;
+//sync_accept_on(erase == save)
+(go && in1 != 0, in_save = in1) |->
+(##1 ebable_out[->3] ##0 out1 == in_save) or (erase == save[->1]);
+endproperty
+
+ap1b : assert property(@(posedge clk) plb) set_save(-1, 1'b0); // pass action
+else set_save(-1, 1'b0); //fail action
+
+initial begin
+    $assertpasson(0); //sync_accept_on 조건이 참이면 공허한 성공이 되어서 action 블록이 실행 안될 수 있으므로 사용해서 실행 강제
+    repeat(200) begin
+        @(posedge clk);
+        if(!randomize(enable_out, in1, erase, out1) with
+        {in1 dist {3:=1 , 4:=1};
+         erase dist {3:=1, 4:=1};
+         out1 dist {3:=1, 4:=1};
+         }) `uvm_error("MYERR", "This is a srandomize error")
+    end
+    $finish;
+end
+endmodule
 
 
 
