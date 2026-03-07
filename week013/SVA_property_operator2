@@ -1,0 +1,111 @@
+always, always[cycle_delay_const_range], s_always[bounded_range]
+명시된 모든 클럭 틱에서 expr이 참이어야 함
+명시된 범위는 표현식의 시작 스레드를 만들 뿐 스레드가 끝나는 시점과는 무관함
++always a |-> b 와 always (a |-> b)는 다름 전자는 괄호로 always와 a를 묶음
+
+공허하지 않기 위한 조건
+always property_expr : expr의 평가 시도가 공허하지 않으며 충분한 클럭 틱 존재 + 이전 클럭 이벤트에서 실패x(어떤 스레드에서도 실패x)
+always[cycle_delay_const_range] property_expr : expr의 평가 시도가 공허하지 않으며 명시된 범위 내 클럭 이벤트가 존재 + 어떤 스레드에서도 실패x
+s_always[bounded_range] property_expr : expr의 평가 시도가 공허 x, 명시된 범위 내 클럭 이벤트 존재, 어떤 스레드에서도 실패x
+
+등가 표현식
+always p  == p until 0
+(m>0) always[m:m] p == nexttime[m] p
+(m<n) always[m:n] p == always[m:n-1] p and nexttime[n] p
+(m>0) always[m:$] p == nexttime[m] p always p
+
+ex. 500cycle 후 프로퍼티 시작 표현 방법
+initial bus_sol1 : assert property(1'b1 ##500 #-# p_active_bus); 
+
+initial begin
+    $assertoff(0);
+    repeat(500) @(posedge clk);
+    $asserton(0);
+end
+ap_active_bus2 : assert property(p_active_bus);
+
+initial begin
+    repeat(500) @(posedge clk)
+    forever begin
+        @(posedge clk)
+        ap_active_bus3 : assert property(p_active_bus);
+    end
+end
+
+====================================================
+eventually, s_eventually
+형식
+eventually[constant_range] propert_expr //
+constant_range 내 한번이라도 expr이 참이되면 됨  
+weak eventually에 bounded_range만 사용 가능
+
+s_eventually property_expr// 
+완료 x시 에러, strong 형식은 형식 검증에서 주로 이용
+
+s_eventually[const_range] property_expr
+
+
+s_eventually p = not(always(not p))
+eventally[m:m] p = nexttime[m] p
+eventually[m:n] p = eventually[m:n-1] p or nexttime[n] p
+
+전부다 공허하지 않기 위해서는
+1. 충분한 클럭 이벤트 존재
+2. 가장 먼저 매치되는 expr이 공허하지 않아야 함
+
+[가이드라인]
+공허히 참인 수 있는 eventually 피하기//오해를 일으키는 결과로 이어질 수 있음
+시퀀스를 expr로 사용하거나 만약 공허일 수 있다면 시뮬레이션 동안 공허 x였음을 증명하기 위한 커버리지 사용
+$rose(req) |-> s_eventually[3:4] $rose(ack) |->> ##[1:2] done , t3에서 공허한 성공이면 t4는 확인 불가
+
+==========================================================
+case
+case item의 결과가 프로퍼티의 평가임을 제외하면 always의 case와 비슷
+default도 사용 가능
+
+<공허>
+default가 없고 모든 비교도 실패하면 아무 프로퍼티문 평가 x => 공허한 성공
+공허하지 않기 위한 조건
+default문이 없을 때 매치되는 case_property_item존재 및 상응하는 프로퍼티문이 공허x
+default가 있다면 default가 실행될때나 다른 case_property_item이 사용될 때나 공허x
+
+========================================================
+accept_on, reject_on, sync_accept_on, sync_reject_on
+이 연산자들은 abort condition이 참일 때 프로퍼티 강제 종료
+abort condition이 거짓이면 남은 프로퍼티 계속 진행
+
+accept들은 공허한 성공 reject들은 공허한 실패 반환
+중복될 수 있으며 샘플된 값 함수 사용 가능(샘플링 이벤트 명시적으로 두기), 하나의 프로퍼티 정의에 여러개도 둘 수 있음
+accept_on(expr_or_dist) property_expr 형태며 expr_or_dist가 abort condition
+
+sync는 동기적 일반은 비동기적 동기적 강제 종료 조건은 프로퍼티의 preponed 샘플링 리전에서 샘플됨
+
+어떤 abort의 연산자의 중첩도 허용
+-가장 외부를 먼저
+LV 참조 불가 시퀀스 메서드 triggerd, matched 포함 불가
+
+accept_in이 LV에 의존하게 만들 때 가장 많이 쓰이는 방법은 LV를 모듈 범수로 복사임
+함수를 만들고 시퀀스 매치 아이템에서 변수 업데이트 필요
+함수를 호출할 경우 멀티 스레드의 충돌을 방지할 수 있도록 추가 변수로 값 설정 후 막아주기
+sync_accpet_in이 참이면 action block실행 안될 수도 있으므로 $assertpasson(0) 사용
+
+공허하지 않기 위한 조건은 전부
+property_expr이 공허하지 않으며  평가 시도의 어떤 타임 스텝에도 expr_or_dist가 지켜지지 않음
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
