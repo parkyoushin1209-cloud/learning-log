@@ -1,0 +1,208 @@
+
+
+module exercise_ch3;
+default clocking cb_clk @(posedge clk); endclocking
+================================================ 1
+
+sequence qReq2Data;
+read_req ##[0:4] data_available; // 시퀀스 -> 사용 x
+endsequence
+
+sequence qXmit2Done;
+Start_xmit ##8 done_xmit;  
+endsequence
+
+========================================= 2
+
+property exercise_2;
+first_match(qReq2Data) |-> ##[0:10]qXmit2Done; // 멀티 스레드 시퀀스가 antecedent면 first_match 적용
+endproperty
+
+========================================== 3
+
+property exercise_3a;
+reject_onsync_reject_on(timeout)
+$rose(BusReq) |=>(BusReq && ack)
+endmodule
+
+property exercise_3b;
+$rose(timeout) |=> !BusReq;
+endproperty
+
+
+=======================================================  4
+동기화된 카운터가 load enable을 받고(ld_n - active low), reset 신호가 deasserted되면 (reset_n, active false)
+=> 다음 클럭 사이클에서 counter의 출력은 counter의 load data 입력(data_in)과 동일 해지는 프로퍼티 작성
+
+property exercise4;
+int v_counter = 0; //option1 LV 이용
+(!ld_n && reset_n, v_counter = data_in) |=> (counter == v_counter); // 조건을 검사하는 것이므로 = 대신 ==이용
+
+-----------------------------------------------
+(!ld_n &&& reset_n) |=> counter == $past(data_in); // $past로 LV 필요성 없앰
+// 기본적으로 한 클럭 이전의 data_in 값 반환 , depth 지정 가능 $past(data_in, 2) //2 클럭 전 값 반환
+
+endproperty
+
+======================================================== 5
+$rose, $fell의 경우 전 클럭에서 변화가 생겼을 때만 실행되는 반면
+신호 기반이면 여러번 반복이 가능해 여러 스레드를 생성할 수 있음
+마찬가지로 범위를 가지고 선행 표현으로 쓰이는 시퀀스는 여러 개의 스레드를 만들 수 있음 따라서 first_match 사용
+// 여러 스레드가 지속적으로 생겨날 경우 어써션 평가 성공을 위해서는 선행 표현에서 스폰되는 모든 스레드가 검사되어야 하므로
+$를 포함하게 된다면 성공은 불가능하고 실패만 가능하게 될 수도 있으므로 first_match가 필요함
+
+========================================================= 6
+property pX7;
+$rose(a) |=> (b[*0:4] ##1 c ##1 !c[*10] ##1 d);
+endproperty : pX7
+// a가 증가했으면 다음 사이클에 b가 0, 1, 2, 3, 4 중 하나의 수만큼 반복해야 하고 b가 나온 다음 사이클에 c가
+// 1이어야 하며 다음 사이클부터 c가 10 사이클동안 0이어야 하며 다음 사이클 에서 d가 1이어야 함
+
+========================================================== 7
+property pX8;
+$rose(a) |=> ##[0:$] ##1 b ##[0:$] d;
+endproperty : pX8
+/*실패할 수 없는 이유
+1. new a가 없다 -> 공허한 성공 != 실패
+2. a가 나왔다 -> ##[0:$] 는 기능적으로만 봤을 때 ##[0:$] 1'b1로 볼 수 있으며 b가 안나오면 
+계속 1 1 1 1 ... 반복 이러다 클럭 틱이 부족하면 weak이므로 공허한 성공 // |=> 의 consequent는 기본적으로 weak
+아니면 b가 나오면 다음으로 넘어가고 이는 b는 최소 1번은 참임을 보장하는 것이고 b는 한 번만 나와도 바로 다음으로 넘어감
+3. a가 나오고 b까지 나왔다 -> 다음 사이클에서 d는 나오거나 안 나오거나 두 가지 모두 가능 
+=> 따라서 이 프로퍼티는 실패할 수 없음
+*/
+
+========================================================== 8
+
+$rose(a) |=> b[*3] ##1 c; 
+// new a 발생시 다음 사이클에 b가 3사이클 연속으로 1이어야 하고 이 다음 사이클에서 c가 1이어야 함
+$rose(a) |=> b[->3] ##1 c; 
+// new a 발생시 다음 사이클부터 시작해서 b가 연속으로 1은 아니어도 되나 1이 3번 나온 다음 사이클에서는 c가 1이어야 함
+$rose(a) |=> b[=3] ##1 c;
+// new a 발생시 다음 사이클부터 시작해서 b가 연속으로 1은 아니어도 되며 1이 3번 나온 다음 사이클에서도 c가 바로 오지 않아도 되나
+// b가 한 번 더 나오는 것은 안됨 c는 b가 3번 1이 나온 상태라면 언제든 1이 되면 됨
+$rose(a) |=> [*3] ##1 b ##1 c;
+// new a 발생시 5사이클 뒤 b가 1 다음 사이클에 c가 1이어야 함 
+// 즉 $rose(a) |=> ##4 b ##1 c로 볼 수 있음
+
+=========================================================== 9 **
+다음의 프로퍼티 작성
+bus_req 다음에 ack 가 10사이클 동안 안 오거나 dma_req 다음에 mem_in_triate 가 5사이클 동안 안 온다면 err__intrpt 어써트됨
+
+apBusReqErrIntrpt : assert property (@(posedge clk) 
+$rose(bus_req) ##1 !ack[*10] |=> err_intrpt);
+
+apDmaReqErrIntrpt : assert property (@(posedge clk)
+$rose(dma_req) ##1 !mem_in_triate[*5] |=> err_intrpt);
+
+=========================================================== 10
+텍스트와 타이밍 묘사를 이용해 이 프로퍼티의 의미를 설명, transaction(send_cmd, header_enb, etc) 의 순서 보이기 
+property pDataTransfer;
+$rose(send_cmd) |=>
+       ##[0:10] header_enb ##1 (data_enb)[*32] ##1 crc_enb;
+endproperty
+
+새 send_cmd 발생 시 0~10사이클 대기 후 header_enb 1 한 사이클 후 32사이클 동안 연속으로 data_enb 가 1 32사이클이 지난 후 바로 
+다음 사이클에 crc_enb가 1
+
+        send_cmd       header_enb      data_enb     crc_enb
+#cycle   0 to 1            1               32          1
+
+
+========================================================== 11
+
+property P; a |=> b |=> c; endproperty : P
+    aP : assert property(@(posedge clk) (P));
+
+@50ns 시도 시작 
+@100ns b가 0 => 어써션은 공허한 성공
+
+============================================================ 12
+프로퍼티 : 1개 초과의 grant가 있으면 안됨(grant는 8비트 버스로 전부 0이거나 한 개의 1만 가질 수 있음)
+property exercise8;
+grant == 8'b0 || $countones(grant) == 1;
+endproperty
+
+property pGrantValues2; // 같은 표현
+$onehot0(grant); 
+endproperty 
+
+============================================================ 13
+
+다음 프로퍼티의 의미 설명
+
+a. sequence qAck; @(posedge clk) ##3 ack; endproperty : qACK // 3사이클 후 ack가 1이어야 함
+
+   property pReqAck; $rose(req) |-> qAck; endproperty : pReqAck // new req 발생시 발생한 사이클에 qAck도 1이어야 함
+
+   property pAckThenPrevReq; qAck.triggered |-> $past(req, 3); // qAck가 참이되는 시점 클럭에서 3사이클 전 req가 1이어야 함
+   endproperty : pAckThenPrevReq                               // triggered는 qAck가 거짓이면 0을 반환함
+
+
+b. property pReq3Acks; $rose(req) |=> ack[*3]; endproperty : pReq3Acks 
+//새 req가 발생하는 클럭틱 포함 다음 2사이클에서도 ack가 1이면 됨
+
+
+c. property pReqAckOnce; $rose(req) |=> ack[->1] within `true[*3];
+   endproperty : pReqAckOnce
+   // 새 req가 발생한 후 다음 사이클에서 3사이클 이내에 ack가 1번 나와야 함
+
+d. property pReqAckDone; $rose(req) ##1 ack[->2] ##1 data_xfr |=> done;
+   endproperty : pReqAckDone
+// 새 req가 발생한 후 다음 사이클부터 ack가 불연속적이든 연속적이든 두 번 나올 때까지 대기하다 두 번 나오는 순간 한 사이클 뒤
+// data_efr이 1 다음 사이클에 done이 1이어야 함
+
+e. property pReqAckDataXFrs; $rose(req) |=> (ack && data_xfr)[=1:31] within `true[*40]
+endproperty : pReqAckDataXFrs
+// 새 req가 나오고 한 사이클 뒤 (ack && data_xfr)이 1이 1번에서 31번 사이로 나와야 하며 이는 총 40사이클 이내에 만족되야 함 
+
+f. property pReqAck100DataXfr; $rose(req) |=> data_xfr[*16] within ack[=1 : 100];
+endproperty : pReqAck1000DataXFrs
+// 새 req가 나온뒤 다음 사이클부터 data_wfr이 연속으로 16번 나와야 하며 이는 ack가 1~100번 나오는 사이에 발생해야 함
+=========================================================== 14
+다음 요구 사항에 대한 어써션 작성
+a. FIFO가 비어있지 않고 진행중인 data output transmission이 없다 그렇다면 새 전송이 5 클럭 사이클 이내에 발생해야 함
+(사용가능한 신호 fifo_size, xmit_status // 0은 전송 없음 1은 전송 모드
+) 
+
+property pNewXmissionOnMt;
+$rose(fifo_size != 0 && xmit_status == 0) |-> ##[1:5] xmit_status;  // rose, fell등 에지 신호 사용 중요
+endproperty
+
+a_pNewXmissionOnMt : assert property(@ (posedge clk) 
+                                     disable iff (reset_n == 1'b0) pNewXmissionOnMt;
+b. 데이터의 전송의 완료되었을 때, 위의 표현대로 하지만 xmit_status의 디어써션이면 CPU 인터엡트가 4클럭 사이클 이내에 어써트돼야함
+property pDataDoneInterrupt;
+$fell(xmit_status) |-> ##[1:4] interrupt;
+endproperty
+
+a_pDataDoneInterrupt : assert property(@(posedge clk) pDataDoneInterrupt);
+============================================================= 15
+if(a) then !(a) until b 를 표현하려고 할 때 
+a ## b 는 이 프로퍼티를 만족하지 않는다 왜 이런가?
+a가 1이 나오면 다음으로 넘어가므로 a가 0임을 확인할 수 없음
+
+위의 프로퍼티를 표현하는 동등한 두 개의 프로퍼티를 작성하라
+a |-> !(a) until b; // until은 b가 참인 순간까지 !(a)가 참일 필요는 없음
+a |=> !a[*1:$] ##1 b;
+
+============================================================ 16
+다음을 진술하는 프로퍼티 작성
+if a then c 가 즉시 따라올 수도 있음( sequence a ##1 c) 
+또는 A가 발생하면, c가 바로 나오거나 b만 나오다가 c가 나옴 (a ##3 b ##1 c) //b가 안 와도 됨
+
+
+
+property p_incorrect; a |=> b[*0:$] ##0 c; endproperty : p_incorrect
+1. 이 프로퍼티가 알맞지 않은 이유는?
+c가 바로 나오는 것이 불가능함 b[*0] ##0 c는 no match임
+
+2.이것이 실제로 표현하는 바는?
+a가 나오고 b가 최소 한 번은 나와야 c가 나올 수 있는 조건이 됨
+
+property exercise16;
+(a |=> c) or
+(a) |=> b[*1:$] ##1 c); // (b[*0] ##1 c) == c
+endproperty
+
+또는
+a |=> b[*0:$] ##1 c;
