@@ -1,0 +1,398 @@
+문제 1
+다음 요구사항을 만족하는 assertion을 작성하세요.
+req가 1이 되면
+1~3 클럭 이내에 grant가 1이 되어야 한다
+조건
+클럭: posedge clk
+reset 동안 (reset_n == 0) assertion disable
+
+property problem1;
+@(posedge clk) disable iff(reset_n == 0)
+$rose(req) |-> ##[1:3] grant; // req가 여러 클럭 1이면 여러 스레드 생성이 가능하므로 $rose 사용
+endproperty
+
+ap_problem1 : assert property(problem1);
+
+==========================================
+문제 2
+다음 조건을 만족하는 assertion을 작성하세요.
+start가 1이 된 이후
+done이 10클럭 이내에 반드시 발생해야 한다
+done이 발생하기 전까지 busy는 계속 1이어야 한다
+
+property problem2;
+@(posedge clk)
+// $rose(start) |-> busy[*1:9] ##1 done;
+$rose(start) |-> busy until_with ##[1:10]done;
+endproperty
+
+ap_problem2 : assert property(problem2);
+
+==============================================
+중급 문제
+문제 3
+다음 조건을 만족하는 assertion을 작성하세요.
+valid가 1이면
+같은 클럭에서 ready도 반드시 1이어야 한다
+
+ap_problem3a : assert property(valid implies ready);
+ap_problem3b : assert property(valid |-> ready);
+ap_problem3c : assert property(valid ##0 ready); //이는 잘못됨 valid가 참일 때 ready를 확인해야 하므로 ##0은 x
+
+즉 valid → ready handshake rule
+=================================================
+문제 4
+다음 조건을 만족하는 assertion을 작성하세요.
+req가 1이 되면
+ack가 3클럭 뒤 정확히 1이어야 한다
+그 전에는 ack가 1이면 안 된다
+
+ap_ploblem4 : assert property($rose(req) |-> !ack[*2] |=> ack);
+
+==========================================
+문제 5
+다음 요구사항을 만족하는 assertion을 작성하세요.
+req가 발생하면
+grant가 올 때까지
+req는 계속 유지되어야 한다
+
+ap_ploblem5 : assert property($rose(req) |-> req until_with grant);
+
+
+// 다음처럼도 쓰나 가독성 측면에서 until_with가 더 좋음
+assert property($rose(req) |-> req throughout (!grant[*0:$] ##1 grant));
+=============================================
+문제 6
+FIFO 인터페이스가 있다.
+신호
+push pop full empty 
+다음 assertion을 작성하세요.
+full일 때 push가 발생하면 안 된다
+empty일 때 pop이 발생하면 안 된다
+
+ap_problem : assert property(
+    (full && !push) or (empty && !pop);
+)  // 잘못됨 두 개다 만족하면 안되므로 and를 사용하고 ~~일때  ~~이다 형식일 때 |-> 사용
+
+//option1
+assert property(full |-> !push);
+assert property(empty |-> !pop);
+
+//option2
+assert property(
+    (full |-> !push) and
+    (empty |-> !pop)
+);
+
+assert property(!(full && push));
+assert property(!(empty && pop)); 
+==============================================
+어려운 문제 (local variable)
+문제 7
+다음 요구사항을 만족하는 assertion을 작성하세요.
+req가 발생한 시점의 addr 값을 저장한다
+grant가 발생하면
+그때의 addr 값이 처음 req 때와 동일해야 한다
+즉
+
+property problem7;
+int v_addr = 0;
+@(posedge clk) 
+($rose(req), v_addr = addr) |-> ($rose(grant) |-> (addr == v_addr)) or 
+(1'b1[*0:$] ##1 $rose(grant) |-> (addr == v_addr));
+endproperty
+
+ap_problem : assert property(problem7);
+// 너무 복잡하며 |->가 많고 or로 인해 너무 느슨 다음과 같이 작성
+
+property problem7;
+int v_addr;
+@(posedge clk)
+($rose(req), v_addr = addr) |-> ##[0:$] ($rose(grant) && addr == v_addr);
+endproperty
+
+ap_problem : assert property(problem7);
+
+req(addr=A) → grant(addr=A)
+
+힌트
+
+local variable
+
+## delay
+
+=========================================================
+문제 8
+다음 요구사항을 만족하는 assertion을 작성하세요.
+req가 발생하면
+grant가 언젠가는 반드시 발생해야 한다
+하지만
+reset이 오면 assertion 종료
+
+assert property(disable iff(reset) $rose(req) |-> s_eventually grant);
+
+
+=================================================
+req가 발생하면
+3~5 cycle 사이에 grant가 와야 한다
+
+그리고
+grant는 정확히 한 번만 발생해야 한다
+
+ap_pl : assert property(req |-> eventually[3:5] grant); //여러 번 발생 가능 
+//=>
+assert property(req |-> ##[3:5] grant ##1 !grant[*]);
+
+=====================================================
+req가 발생하면
+grant가 올 때까지 req는 유지되어야 한다
+
+단
+grant는 1~5 cycle 사이에 와야 한다
+
+assert property($rose(req) |-> (req && !grant)[*0:4] ##1 grant); // 다음처럼도 작성 가능
+//              $rose(req) |-> req until_with ##[1:5] grant
+
+=====================================================
+req가 발생하면
+3~5 cycle 사이에 grant가 와야 한다
+그리고
+grant는 정확히 1 cycle pulse여야 한다
+
+assert property($rose(req) |-> ##[3:5] grant ##1 !grant[*]); // [*] 면 안 끝날 수도 있음 
+//[*]를 지우거나 아니면 실무에서는 다음과 같은 방식 이용
+assert property($rose(req) |-> ##[3:5] $rose(grant));
+assert property($rose(grant) |=> !grant);
+
+=======================================================
+req가 발생하면
+grant가 올 때까지 req는 유지되어야 한다
+단
+grant는 반드시 1~5 cycle 사이에 와야 한다
+그리고
+grant가 오기 전에는 grant가 1이면 안 된다
+
+assert property($rose(req) |-> req until_with ##[1:5] $rose(grant))
+//다음처럼도 가능
+assert property($rose(req) |-> (req && !grant) until_with ##[1:5] $rose(grant));
+
+==============================================================
+req가 발생하면
+grant가 올 때까지 req는 유지되어야 한다
+하지만
+grant는 정확히 3 cycle 뒤에 와야 한다
+
+assert property($rose(req) |-> (req && !grant)[*2] ##1 grant);
+
+
+================================================================
+req가 발생하면
+grant는 1~5 cycle 사이에 와야 한다
+
+하지만
+grant는 정확히 한번만 발생해야 한다
+그리고
+req는 grant가 올 때까지 유지
+
+assert property($rose(req) |-> (req && !grant) until [1:5] grant); //until 다음에 ##는 올 수 없음
+
+assert property($rose(req) |-> (req && !grant)[*0:4] ##1 grant); // 또는
+
+assert property($rose(req) |-> req until_with ##[1:5] grant);
+
+==============================================================
+req가 발생하면
+grant는 반드시 발생해야 한다
+
+하지만
+reset이 오면 assertion은 종료
+
+assert property(disable iff(reset)
+                $rose(req) |=> s_eventually grant); // 보통 이런 liveness property는 |->를 더 많이 사용함
+
+============================================================
+s_eventually expr ≡ strong(##[1:$] expr) // s_eventually는 문법적으로 ##[1:$]임
+req |-> strong(##[1:$] grant)
+// 따라서 두 프로퍼티는 동치인 프로퍼티라 볼 수 있음
+
+============================================================
+assert property(req |-> grant);
+≡ !req or grant // combinational rule
+assert property(req |=> grant);
+≡ !req or ##1 grant // temporal rule
+
+cycle 0   1   2
+req   1   1   0
+grant 0   1   0
+이 파형에서 전자는 즉시 실패하나 , same cycle rule -> 프로토콜 룰에 주로 이용
+후자는 스레드를 생성한다, next-cycle response -> 보통 pipeline / latency rule에 사용
+
+
+일반적으로 
+a |-> ##1 b; 는
+a |=> b; 와 동일한 표현이나
+
+다음처럼 sequence delay가 없다면
+a |-> b; 와
+a |=> ##0 b; 는 다른 표현이다
+
+===============================================================
+req |-> ##[1:3] grant ##1 done ---- A // 
+req |-> ##[1:3] (grant ##1 done) ---- B
+
+A에서
+ 
+ g d ok
+ g g d ok
+ g g g d ok
+
+ B에서
+
+ g g d fail
+
+///// ** 두 식은 동일함
+// SVA operator precedence => grant ##1 done이 (grant ##1 done으로 묶이게 됨)
+
+============================================================
+assert property($rose(req) |-> ##[1:3] grant);
+cover  property($rose(req)); 공허한 성공을 잡는 커버리지 작성법
+
+
+
+==========================================================
+동기화된 abort 사용 방법
+1. sync_accept_on 사용
+
+op1 : assert property(@(posedge clk)
+sync_accept_on(!rst_n)
+a |-> ##3 b;)
+
+2. 샘플된 값 함수 이용
+op2 : assert property(@(posedge clk))
+      disable iff($fell(!rst_n, @(posedge clk))) // sample을 제외한 샘플된 값 함수에는 clk_event 명시
+      a |-> ##3 b;
+
+3. triggered 이용 // 시퀀스 인스턴스와 clk 필요
+
+sequence seq;
+@(posedge clk) $rose(soft_hardware_reset_command) ##1 ack;
+endsequence
+
+op3 : assert propert(
+    @(posedge clk) disable iff(seq.triggered)
+    a |=> b;
+)
+
+
+============================================================
+
+16비트 입력에서 여러 개의 request가 동시에 발생할 수 있지만, 
+grant는 하나만 발생하며 더 높은 비트가 더 높은 우선순위를 갖는 경우에 대한 assertion을 작성하라.
+
+import uvm_pkg::*;
+`include "uvm_macros.svh"
+module arbiter;
+bit[15:0] req, grnt;
+bit clk;
+initial forever #5 clk = !clk;
+
+generate for (genvar i = 0, i<=15; i++)
+begin
+    property p_arbiter;
+    bit[16:0] v;
+    (req[i]==1'b1, v=0, v[i+1]=1'b1) ##0 req < v |->
+    grnt[i]==1'b1 ##0 $onehot(grnt);
+    endproperty : p_arbiter
+    ap_arbiter : assert property(@(posedge clk) p_arbiter);
+end
+endgenerate
+ap_zero_req0 : assert property(@(posedge clk) req==0 |=> grnt==0);
+ap_zero_req1 : assert property(@(posedge clk) req==1 |=> grnt==1);
+
+always @(posedge clk)
+if(!randomize(req, grnt) with {req < 15; $onehot(grnt) == 1'b1;}) // 이 onehot은 이미 있는 1을 바꿔주는 것이 아닌 1이
+endmodule // 더 많이 존재한다면 randomize 실패
+
+
+// 위의 코드는 오류 존재
+
+import uvm_pkg::*;
+`include "uvm_macros.svh"
+
+module arbiter;
+
+rand bit [15:0] req, grnt;
+bit clk;
+
+initial clk = 0;
+initial forever #5 clk = !clk;
+
+// ----------------------------
+// Arbiter priority assertion
+// ----------------------------
+generate
+  for (genvar i = 0; i < 16; i++) begin
+
+    property p_arbiter;
+      bit [16:0] v;
+
+      (req[i] == 1'b1, v = 0, v[i+1] = 1'b1) ##0 (req < v)
+      |-> (grnt[i] == 1'b1 ##0 $onehot(grnt));
+
+    endproperty
+
+    ap_arbiter : assert property(@(posedge clk) p_arbiter);
+
+  end
+endgenerate
+
+
+// ----------------------------
+// No request → no grant
+// ----------------------------
+ap_zero_req :
+assert property(@(posedge clk)
+  req == 0 |-> grnt == 0
+);
+
+
+// ----------------------------
+// Random stimulus
+// ----------------------------
+always @(posedge clk) begin
+
+  if (!randomize(req, grnt) with {
+        $onehot0(grnt);     // grant는 0 또는 one-hot
+      })
+  begin
+    $error("Randomization failed");
+  end
+
+end
+
+endmodule
+
+
+
+
+
+===================================핵심===========================================================
+antecedent에서 신호민감형이면 여러 시도를 만들 수 있으므로 오버래핑 문제를 해결하려면
+에지민감형 이용 $rose, $fell 등
+|-> 가 반드시 필요한 경우가 아니라면 사용 최소화
+
+~할 때까지 ~하면 안된다 구조
+assert property($rose(req) |-> (req && !grant)[*0:4] ##1 grant); 
+                $rose(req) |-> req until_with ##[1:5] grant
+
+until 다음에 ## 사용 x [m:n]형식만 사용
+
+s_eventually는 문법적으로 strong(##[1:$] expr)
+
+|->는 same cycle rule -> 프로토콜 룰에 주로 이용
+|=>는 next-cycle response -> 보통 pipeline / latency rule에 사용
+
+req |-> ##[1:3] grant ##1 done ---- A // 
+req |-> ##[1:3] (grant ##1 done) ---- B 두 식은 같은 표현
+
+공허한 성공 커버리지를 잡고 싶다면 cover property(antecedent_property_expr) 이용
