@@ -1,0 +1,89 @@
+UVM 심각도 레벨 함수
+`uvm_info(ID, MSG, VERBOSITY)
+`uvm_warning(ID,MSG)
+`uvm_error(ID,MSG)
+`uvm_fatal(ID,MSG)
+ID : 태그
+MSG : 출력할 메시지
+VERBOSITY :
+info만 가지는 인자
+메시지 verbosity <= 현재 verbosity 설정이면 메시지 출력
+`uvm_info의 verbosity는 메시지 verbosity
+
+현재 verbosity 설정은 
+커맨드에서 +UVM_VERBOSITY A 형태나 uvm_top.set_report_verbosity_level(A) 형태로 가능
+A에는 다음의 것들이 올 수 있음   UVM_NONE   UVM_LOW  UVM_MEDIUM  UVM_HIGH  UVM_FULL  UVM_DEBUG
+
+=======================================================================
+SV는 어써션 평가를 제어하는 시스템 테스크를 제공하며 어써션 검사가 불필요할 때 
+시뮬레이션 속도를 높이고 초기화동안 어써션을 검증할 필요가 없을 때 false reporting을 방지하기 위해 disable iff를 사용할 필요가 없다는 
+장점을 가짐
+
+어써션 시스템 테스크는 반드시 절차적 블록 안에 있어야 함 ***
+
+1. assert control
+syntax
+$assertcontrol(control_type[, [assertion_type] [, [directive_type]
+[, [levels] [, list_of_scopes_or_assertions]]]])
+
+control_type 효과제어 , 정수 표현식이어야 함
+assertion_type 영향을 받을 어써션 타입 선택, 정수 표현식이어야 함, 명시 안 되어있으면 어써션 모든 타입 , expect문에 대해 기본값
+directive_type 영향을 받을 지시어 타입(assert, cover, assume..), 정수표현식이어야 함, 명시 안 되어있으면 기본값
+level : 계층 레벨 명시 (레벨은 dumpvars의 레벨과 같게 생각 가능), 기본은 0 = 먕시된 모든 및 이 이하의 모든 모듈 인스턴스)
+list_of_scopes_or_assertion : 제어할 모델 scope 명시
+
+lock 1 - 모든 어써션, expect문의 상태 변화 방지
+unlock 2 - 잠긴 상태 제거
+on 3 - 어써션의 실행 다시 인에이블, expect문에는 영향 없음. 잠긴거는 예외
+off 4 - 
+어써션의 검사 중단, 
+expect문에는 영향 없음, 
+새 시도의 시작도 없음
+이미 실행된 시도, 이들의 pass/fail에는 영향 없음
+큐에 들어가 있거나 아직 진행중인 어써션은 삭제 x , 이후 평가될 수 있음
+어써션의 새inst는 큐에 안 들어감
+
+kill 5 -
+현재 실행중인 어떤 시도의 실행도 강제 종료
+보류중인 리포트, 보류중인 절차적 어써션 inst들도 삭제 
+expect문에 영향 없음
+
+passon 6 - pass action 실행 인에이블
+이미 실행된 시도, 이들의 pass/fail에는 영향 없음
+passoff 7 - pass action 실행 중단
+이미 실행된 시도, 이들의 pass/fail에는 영향 없음
+
+failon 8 - fail action 실행 인에이블
+default fail action에도 영향 줌
+이미 실행된 시도, 이들의 pass/fail에는 영향 없음
+if문에 else가 없다면 $error 호출
+
+failoff 9 - fail action 실행 중단
+default fail action에도 영향 줌
+이미 실행된 시도, 이들의 pass/fail에는 영향 없음
+
+nonvacuouson 10 - 공허하지 않은 성공에 대해 pass action 인에이블
+이미 실행된 시도, 이들의 pass/fail에는 영향 없음
+
+vacuousoff 11 - 공허한 성공의 pass action 실행 중단
+이미 실행된 시도, 이들의 pass/fail에는 영향 없음
+
+[가이드라인]
+테스팅 환경이 안정화될 때까지 어써션 검사 무효화 권장
+추가로 pass action 블록 무효화 권장 - 여기서 모듈 변수가 업데이트 되거나 디버깅 시에만 필요
+
+event start_sim;
+$assertcontrol(KILL);
+wait(start_sim);
+이런 식으로 어써션 검사 무효화하고 wait 해결될 때까지 대기 
+초기화되는 동안 모든 어써션이 무효화 될 것이므로
+assert(inst.randomize()) 말고 if(!inst.randomize()) 이용
+
+rand 변수를 가진 클래스라면 다음을 이용
+if(!class_inst.randomize()) $error ~~~
+if(!class_inst.randomize()) `uvm_error~~~
+
+
+
+
+
