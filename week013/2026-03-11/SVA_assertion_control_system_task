@@ -1,1 +1,69 @@
 $assertcontrol(control_type[,[assertion_type] [,[directive_type][,[levels][,list_of_scopes_or_assertions]]]])
+
+assertion_type
+$assertcontrol에 의해 영향 받을 어써션 타입 선택
+정수 표현식이어야 함
+여러 값을 ORing해 여러 assertion_type 값 명시 가능 // 3 이면 concurrent | simple_immediate
+명시 안 되었을 때 default 31
+
+1  | concurrent                  | assert property(a |=> b)
+2  | simple_immediate            | immediate assert(a && b)
+4  | observed_deffered_immediate | assert #0 (a && b)
+8  | final_deffered_immediate    | assert final(a && b)
+16 | expect                      | expect(a |=> b)
+32 | unique                      | unique if(a==0) c<=b; else if(a==1) c<=d;
+64 | unique0                     | unique0 if(a==0) c<=b; else if(a==1) c<=d;
+128 | priority                   |priority if(a==0) c<=b else if(a==1) c<=d;
+
+
+directive_type
+$assertcontrol에 의해 영향 받을 지시어 타입 선택
+정수 표현식이어야 함
+ORing 가능
+default 7
+
+1 | assert directives
+2 | cover directives
+4 | assume directives
+
+level = 현재 모델 포함 어느 계층까지 포함할지(0은 전부)
+list_of_scopes_or_assertions = 제어할 모델의 범위 scope나 assertion도 가능, 이 요소를 기준으로 level만큼 계층 깊이를 참고함
+
+
+[가이드라인] 디자인 내 모든 모듈에 대한 ON/OFF 어써션 제어를 위해 분히된 어써션 제어 모듈 사용
+
+assertion action block control system task
+장점
+1. 출력을 줄여 불필요한 정보를 포함하는 매우 큰 로그 파일 생성을 막아줌 
+2. simulation 수행 능력 향상 - 출력이 줄어드므로
+
+assert_Action_control_task ::= assert_action_task[(levels[, list_of_modules_or_assertions])]
+assert_action_task ::= $assetpasson | $assertpassoff | $assertfailon | $assertfailoff | $assertnonvacuouson | $assertvacuousoff
+
+$assetpasson - pass action enable - 공허 o,x 성공에 모두 동작
+$assertpassoff - pass action disable - 공허 o,x 성공에 모두 동작
+$assertfailon - fail action enable 
+$assertfailoff - fail action disable - 디자인 에러를 숨길 수 있기 때문에 추천하지 않고 사용할거면 주의해서
+$assertnonvacuouson - 공허하지 않은 성공에 대한 action block enable - False positive를 방지하므로 $asserton 보다 추천
+$assertnonvacuousoff - 공허하지 않은 성공에 대한 action block disable - 로그 파일 출력 최소화
+이 태스크들은 호출들이 실행됐을 때 이미 진행중인 어써션에는 영향 안 줌, 구현이 어써션 리포트의 일부로써 제공할 수도 있는 통계도 변화 주지 않음
+
+[가이드라인]
+action block report의 장황도를 줄이기 위해 위에 정의된 액션블록 제어 태스크 사용
+절차적 코드에서 세트되어야 함
+시뮬레이션 타임에 장황도 선택이 가능한 또 다른 방법은 액션 블록에 uvm 매크로 사용
+
+
+//동등한 표현식
+$assertoff == $assertcontrol(4, 15, 7, levels[, list])
+$assertkill == $assertcontrol(5, 15, 7, levels[, list])
+$asserton == $assertcontrol(3, 15, 7, levels[, list])
+$assertpasson[(levels[, list])] == $assertcontrol(6, 15, 7, levels[, list])
+$assertpassoff[(levels[, list])] == $assertcontrol(7, 15, 7, levels[, list])
+$assertfailon[(levels[, list])] == $assertcontrol(8, 15, 7, levels[, list])
+$assertfailoff[(levels[, list])] == $assertcontrol(4, 15, 7, levels[, list])
+$assertnonvacuouson[(levels[, list])] == $assertcontrol(10, 15, 7, levels[, list])
+$assertvacuousoff[(levels[, list])] == $assertcontrol(11, 15, 7, levels[, list])
+
+[가이드라인]
+공허한 성공에 대한 pass action block은 전형적으로 유용하지 않다 -> 어써션 사용시 $assertvacuousoff(0) 사용 추천
