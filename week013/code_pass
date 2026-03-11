@@ -1,16 +1,28 @@
-module my_control();
-initial begin
-    $display("%0t %m Disabling assetion during init....", $time);
-    $assertoff(0, top_tb.cpu_rtl_1);
-    @(top_tb.reset_n === 1'b1);
-$display("%0t %m Enabling assertions after init...", $time);
-$asserton(0, top_tb.cpu_rtl_1);
-end
-endmodule : my_control
-module top_tb;
-logic clk = 1'b0,   reset_n = 1'b0;
-bus_if b_if;
-cpu_rtl cpu_rtl_1(clk, reset_n, *);
-my_control my_control();
-..
-endmodule : top_tb
+module Ice;
+bit clk, clk0, clk2, a, b, c, d, e;
+initial forever #10 clk = !clk;
+
+ap_and_seq_ERROR : assert property(
+    (@(posedge clk) a ##1 b) and
+    (c ##2 d) );
+
+ap_and2_seq_ERROR2 : assert property(
+    (@(posedge clk) a ##1 b) and
+    (@(posedge clk2) c ##2 d) );
+
+ap_and2ab : assert property(@ (posedge clk0) 1|->
+(@(posedge clk) a ##1 b) and
+(@(posedge clk2) c ##2 d));
+
+ap_and2_Prop_ERROR : assert property(
+    (@(posedge clk) 1 |-> a ##1 b) and
+    (@(posedge clk2) 1 |-> c ##2 d) );
+
+ap_and2_Prop_OK_same_clk : assert property(
+    (@(posedge clk) 1 |-> a ##1 b) and
+    (@(posedge clk) 1 |-> c ##2 d) );
+
+ap_and2_Prop_OK : assert property( @(posedge clk0) 1 |->
+(@(posedge clk) 1 |-> a ##1 b) and
+(@(posedge clk2) 1 |-> c ##2 d) );
+endmodule
