@@ -1,13 +1,19 @@
-cover_property_Statement ::=
-  cover property (property_spec) statement_or_null
 
-cover_sequence_statement ::=
-  cover sequence (
-     [clocking_event] [disable iff(expression_or_dist)]
-                     sequence_expr) statement_or_null
+  규칙:
+  액션 블록 내 패스문은 어떠한 동시 assert, assume, cover문도 포함해서는 안 됨
+  커버리지 결과는 (프로퍼티를 위한 커버리지, 시퀀스를 위한 커버리지) 두개로 나누어짐
 
-simple_immediate_cover_statement ::=
-  cover (expression) statement_or_null
-deferred_immediate_cover_statement ::=
-  cover #0 (expression) statement_or_null
-  | cover final (expression) statement_or_null
+  프로퍼티에 대한 커버리지문의 결과는 다음을 포함
+  - 시도된 타임의 수   - 성공한 타임의 수  - 공허로 인해 성공한 타임의 수
+
+
+  시퀀스에 대한 커버리지문의 결과는 다음을 포함
+  - 시도된 타임의 수  - 매치된 타임의 수(각 시도는 여러개의 매치를 생성할 수 있음)
+
+  즉각적 커버문은 표현식의 성공적인 평가가 커버리지 목표임을 명시함
+  즉각적 커버문의 커버리지 결과는 다음을 포함함
+  - 평가된 타임의 수  - 성공한 타임의 수
+  
+  즉각적 커버에 대한 패스문은 statement_or_null에 명시될 수도 있다.
+  패스문은 평가식이 참으로 평가되면 실행되어야 함
+  패스문은 즉각적 커버의 표현식 평가 후 즉각적으로 실행되도록 enable될 수도 있다.
