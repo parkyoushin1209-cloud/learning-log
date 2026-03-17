@@ -1,0 +1,27 @@
+simple 어써션
+-절차적 코드에서 문장이 실행될 때 표현식 수행
+-표현식은 절차문의 if문 조건 내 expr과 같은 방식으로 평가 // 0,x,Z -> fail, 1 -> pass
+-절차문 어디서나 사용 가능
+-assume, assert, cover 가능 / restrict 불가능
+* randomize()와 함께 사용 시 assertoff면 랜덤화가 안 될 수 있음
+
+지연된 어써션
+-simple 어써션은 assign문, always_comb에서 같은 타임 stamp에 여러번 평가될 수 있어 글리치 신호에 취약함 -> deferred assertion이 도입됨
+//어써션과 태스트되는 값 사이 레이스 컨디션 방지를 위해
+-verification_directive #0(observed deferred assertion) ~~ 형식 또는 #0 대신 final(postponed deferred assertion)
+
+어써션의 액션 블록은 바로 실행되지 않으며 액션 블록의 서브루틴 호출, 입력 인자의 현재 값은 현재 실행되는 프로세스와 관련된 deferred assertion report queue로 들어가며
+observed에서 평가 실행 준비가 끝난는지 확인
+끝났다면 flush point에서 실행
+끝나지 않았다면 다시 대기
+
+[가아드라인]
+논블로킹 방식만 있는 경우 지연된 어써션 불필요
+외부 신호를 사용하거나 조합 논리에 의존하는 경우 지연된 어써션 사용 추천
+
+simple assertion : active리전에서 평가되며 글리치에 취약함
+#0 : NBA이후 값으로 평가
+final : postponed의 안정된 값을 이용해 평가 가능 // observed 이후에도 TB 등에 의해 신호가 변할 수 있으므로 final이 더 안전
+
+
+
