@@ -1,0 +1,19 @@
+module sp2;
+bit clk, a=1, b=1, c;
+initial forever #5 clk = !clk;
+default clocking cb_clk @(posedge clk); endclocking
+sequence q_ab(a, b); @(posedge clk) a ##1 b; endsequence : q_ab
+always_ff @(posedge clk) begin : aly
+automatic logic x;
+ap_legal : assert property(q_ab(a, b).triggered |=> c);
+ap_illegal : assert propert(
+    q_ab(x, b).triggered |=> c); // 불법 x는 자동
+
+end : aly
+
+initial begin : init
+automatic logic y;
+y=a;
+@ q_ab(y, b) $display("done init"); // 불법 y는 자동
+end : initial 
+endmodule : sp2
