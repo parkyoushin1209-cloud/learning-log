@@ -1,0 +1,32 @@
+module msl;
+parameter CACHE_SIZE = 8;
+parameter MEM_DATA_WIDTH = 8;
+int st0 = 0;
+logic a, b, clk;
+automatic int k; // RULE : 뱐수 k 선언에 대한 automatic의 불법적 사용
+logic [(CACHE_SIZE-1):0][MEM_DATA_WIDTH-1:0] cache_mem;
+
+initial begin
+   int st1;
+   static int st2;
+   automatic int auto1;
+end
+task automatic t1();
+int auto2;
+static int st3;
+automatic int auto3;
+endtask
+always_ff @(posedge clk) begin : aly 
+   automatic int au1;
+   static int st;
+   if(a)  // aㄴ느 preponed에서 샘플된 값
+   for(int i=0; i<= 255; i++) begin // i는 자동
+      cache_mem[i] = i; // i의 현재 값 사용
+   end
+end : aly
+
+initial begin
+   aly.st = 0; // RULE : 자동 블럭(aly) 내 정적 아이템 st로의 합법적 계측적 접근
+   aly.au1 = 0; // RULE : 자동 블럭(aly) 내 아이템 au1로의 불법적 계층적 접근
+end
+endmodule
