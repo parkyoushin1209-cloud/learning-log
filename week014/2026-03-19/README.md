@@ -1,54 +1,23 @@
-module m; int d2[]; endmodule : m
-module top; m m1(); endmodule : top
-checker mchk1(input event clk_ev,
-              output logic d_out,
-              output untyped ot);
-wire w1, w2;
-int dyn[];
-int a_size, i=0, k1, k2, k3, k4, k5;
-typedef logic [31:0] 132_type;
-typedef logic [16:0] 116_type;
-logic reset_n=1'b1, write=0;
-116_type mem_array[132_type];
-132_type addr=0, asize;
-116_type wdata, rdata;
+체커 내부 어써션의 동작은 어써션의 타입(정적/절차적)과 체커의 인스턴스 방법(inside[in-block] 또는 절차적 코드 내부[inline])에 의존한다.
 
-assign w1=!write;
-assign k5=k2;
-always @clk_ev begin
-k1 <= top.m1.d2[0];
-if(reset_n==1'b0) mem_array.delete;
-else if (write) mem_array[addr] = wdata;
-if(mem_array.exists(addr)) rdata <= mem_array[addr];
-asize <= mem_array.size;
-end
+규칙
 
-initial begin
-    dyn = new[5];
-    foreach(dyn[j])
-    dyn[j] = j;
-end : dy1
+정적으로 인스턴스화되는 체커의 모든 정적 어써션은, 그들이 인스턴스화되는 유닛 내부에서 해당 블록에 직접 인스턴스화된 것처럼(in-block) 동작한다.
 
-always_ff @clk_ev begin : a1
-automatic int v;
-v <= 0;
-for(int z=0; z<32; z++) begin
-    addr[i] =1'b1;
-end
-end
-task tsk();
-...
-endtask : tsk
+절차적으로 인스턴스화되는 체커의 모든 정적 어써션은, 코드 상에서 해당 위치에 직접 인스턴스화된 것처럼(inline) 동작한다. 따라서 유닛 내부 절차의 모든 전제조건이 충족된 이후에 큐에 들어간다. 이는 모듈 내 always 블록 안에 작성된 concurrent assertion과 동일한 동작이다. 만약 어써션이 always와 동일한 선행 클럭킹 이벤트를 사용한다면, 그 선행 클럭킹 이벤트는 현재 클럭 이벤트가 된다. 반면, 어써션이 다른 선행 클럭킹 이벤트를 사용하는 경우(즉, 다른 클럭), 큐에 들어간 어써션은 해당 어써션에 정의된 선행 클럭킹 이벤트에서 평가된다.
 
-initial begin
-    fork
-        begin
-            tsk();
-        end
-        begin
-            k1 <= 1;
-            k2 <= 2;
-        end
-    join
-end
-endchecker : mchk1
+정적/절차적으로 인스턴스되는 체커의 모든 절차적 어써션은, 그들이 인스턴스화되는 유닛(예: 모듈, 인터페이스, 프로그램, 체커 내부)의 블록에서 직접 인스턴스화된 것처럼(in-block) 동작한다. 따라서 절차적 어써션은 다른 프로시저 내부에 중첩되어 존재하지 않으며, 체커 내부의 프로시저들은 효율적으로 그들을 포함하는 객체(enclosing object)의 최상위 레벨로 끌어올려진다(lifted).
+
+만약 체커가 다른 체커 내부에서 절차적으로 인스턴스된다면, 인스턴스되는 체커의 모든 정적 어써션은 inline으로 동작하고, 모든 절차적 어써션은 부모 유닛의 top-level(in-block)에서 인스턴스화되는 경우와 유사하게 동작한다.
+
+기본적으로 이 규칙들은 다음과 같이 요약할 수 있다.
+A) 정적 어써션(즉, checker 내부 블록에 있는 것들)은 해당 checker가 어떤 블록 안에 인스턴스화되면 그 블록 내부(in-block)에서 처리된다.
+B) 정적 어써션은 해당 checker가 프로시저 내부에서 인스턴스화되면 inline으로 처리되며, 즉 어써션이 인스턴스화된 코드 위치에서 실행된다.
+C) 절차적 어써션(always, initial, final 내부)은 checker의 인스턴스 위치와 관계없이 항상 모듈 내부에서 in-block처럼 처리된다.
+
+in-block은 always, initial, final 외부뿐만 아니라 유닛 내부 블록(모듈, 인터페이스, 프로그램 등)을 의미한다.
+inline은 always, initial, final 내부에서 어써션이 인스턴스되는 지점을 의미하며, 해당 위치의 어써션 규칙을 따른다.
+
+가이드라인 : 검증 유닛이 느슨하게 결합된 정적/절차적 어써션을 요구하는 경우, 이들을 각각 별도의 체커로 그룹화하여 절차적 어써션과 정적 어써션을 분리하는 것이 바람직하다. 이렇게 하면 구조가 더 명확해지고 사용 의도가 분명해진다. 느슨하게 결합된 한 타입(예: static)의 어써션 집합은 다른 타입(예: procedural)을 지원하기 위한 코드에 의존하지 않도록 하는 것이 좋다.
+
+가이드라인: 클럭에 대한 formal argument를 모듈에서 일반적으로 선언하는 방식과 달리 event 타입의 객체로 선언하는 것이 좋다. 이 방식은 하나의 제네릭 체커가 사용자가 원하는 posedge, negedge, 또는 양쪽 에지에서 모두 동작할 수 있도록 해준다.
