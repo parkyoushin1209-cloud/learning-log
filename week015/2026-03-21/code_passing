@@ -1,41 +1,40 @@
-규칙: 선언에서 형식 인자의 기본값으로 하는 컨텍스트 값 함수
-체커의 중요한 이점은 체커가 인스턴스화되는 문맥에서의 유연성임
-체커로 인스턴시에이션 문맥을 전달하기 위해 이 것을 문맥 값 함수($inferred_clock, $inferred_disable)와 결합하는 것은 재사용성 높은 코드 생성에 도움이 되고 따라서 코드의 장황성을 상당히 줄여준다.
-문맥 값 함수는 체커 선언 내 형식 인자의 기본값으로서만 사용될 수 있다; 이들은 체커의 몸체에 존재할 수 없다. 
-이런 함수들은 체커 동작을 인스턴시에이션 문맥에 적응할 수 있도록 할 수 있다.
+규칙: 
+정적, 자동 변수 사용에 대한 규칙과 가이드라인은 2.6.4절 묘사된 내용과 다음의 제약, 규칙과 같음
+[1] 변수는 체커에서 정의될 수도 있으나, 체커 몸체에 넷을 선언하는 것은 불법임
+체커 몸체에 선언된 모든 변수들은 정적 수명을 가짐(즉, 시뮬레이션의 수명동안 존재함)
+체커 몸체에 선언된 변수들은 체커 변수로서 참조됨. 이러한 변수들은 시퀀스/프로퍼티에서 합법적으로 사용 가능한 타입들이 될 수 있으며 넷 타입은 올 수 없다.(wire)
+할당에서 이것의 계층적 이름을 이용해 체커 변수로의 참조는 불법이다.
+[1] 다음의 체커 선언으로 둘러싸인 스코프로부터의 요소들은 체커에서 참조될 수 없다.
+-자동 변수, 멤버 또는 다이나믹 변수의 요소
+-fork..join 류의 블록 요소들
 
-import uvm_pkg::*;
-`include "uvm_macros.svh"
-parameter WIDTH =2; //파라미터를 체커 외부에 둠, 내부에 두는 것은 불법임
-checker chk_decrement (bit [WIDTH-1 : 0] test_expr,
-                       event clk = $inferred_clock, // 기본 인자
-                       bit rst = $inferred_disable);
-a1 : assert property( @ clk
-                 disable iff (rst) !$stable(test_expr) |->
-                 ($past(test_expr) == test_expr + 1'b1));
-endchecker : chk_decrement
+규칙:
+체커 선언으로 둘러싸인 스코프로부터의 다음 요소들은 체커에서 참조될 수 없음
+-	자동 변수, 멤버 또는 다이나믹 변수(즉, 다이나믹 배열, 큐, 연관 배열)의 요소
+따라서 아래의 예시에서, module m으로 둘러싸인 체커로부터 모듈 다이나믹 배열 변수 dyn 또는 자동 변수 ff1.v로의 접근은 불법이다.
+-fork..join, fork..join_any, fork..join_none 블록의 요소들,
+Fork..join의 모든 형식들은 체커에서 불법이다.
+-체커의 형식인자와 체커 변수는 자동 변수, 다이나믹 배열, 큐, 연관 배열일 수 있다. 그러나, 이것들은 포함되는 스코프로부터 참조될 수 없다.
 
-module m();
-bit clk, clk2, dec_enabled, reset;
-bit [WIDTH - 1:0] d;
-default clocking default_clk @(posedge clk) ; endclocking
-default disable iff reset;
-initial forever #5 clk = !clk;
-initial forever #7 clk2 = !clk2;
-chk_decrement d_chk_static(d);
-// 다음과 동일함
-// chk_decrement d_chk_verbose(d, posedge clk, reset);
-// Clock은 문맥으로부터 추론됨
-
-always @(posedge clk2)
-if(dec_enabled)
-chk_decrement d_chk_proc (d);
-// 다음과 동일
-// chk_decrement d_chk_verbose (d, posedge clk2, reset);
-// Clock이 always 감지리스트로부터 추론됨
-
-always @(posedge clk)
-if(!randomize(d, dec_enabled))
-`uvm_error("MYERR", "This is a randomize error");
-
+module m;
+int dyn[];
+...
+checker chk_count(event clk_ev,
+                  input bit a, b, c,
+                  input int max,
+                  output bit[31:0] count);
+bit x, y;
+assign y = a && b; //합법, y는 지역변수
+assign x = a && ff1.v //불법, 자동변수로의 참조
+ap_illegal_aa : assert property(
+                    @(posedge clk) dyn[0] == 0); //불법, 체커의 스코프에서 다이나믹 변수 참조
+always_ff @(posedge clk) begin : ff1
+automatic bit[31:0] v;
+v=count;
+if(a) v+=1'b1;
+if(!a) v-=1'b1;
+count <= v;
+end : ff1
+ap_count : assert property(@(clk_ev) count < max);
+endchecker : chk_count
 endmodule : m
