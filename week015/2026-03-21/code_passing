@@ -1,107 +1,49 @@
-규칙: 체커가 인스턴스화될 때, 실인자(actual argument)는 체커로 전달된다. 입력 인자를 체커로 전달하는 메커니즘은 assertion 프로퍼티로 전달하는 방식과 유사하며, 다음의 제한이 적용된다.
+체커는 많은 환경에서 정의될 수 있다.
+1)	컴파일 가능한 분리된 유닛으로서
+2)	패키지 내부
+3)	모듈 내부
+4)	체커 내부
+5)	인터페이스 내부
+6)	프로그램 내부
+이들은 체커가 모듈/인터페이스/프로그램에서 인스턴스화되거나 bind 생성자를 통해 바인드되도록 허용한다.
+아래는 체커 사용 메서드의 리스트오 각 접근법에 대한 코멘트이다.
 
-시퀀스와 프로퍼티의 경우, 체커 인스턴스로 전달되는 실 input 인자가 $라면, 이에 대응하는 형식 인자는 untyped여야 한다. 또한 해당 형식 인자의 각 참조는 cycle_delay_const_range_expr의 상한(upper bound)이거나, 그 자체로 명명된 시퀀스/프로퍼티 또는 다른 체커 인스턴스의 실인자로 사용될 수 있다.
-실 input 인자가 const cast이거나, 절차적 코드로부터 생성된 자동 값(automatic value)을 포함하는 어떤 부분 표현식(subexpression)을 포함한다면, 대응되는 형식 인자는 체커 내부의 계속적 할당(continuous assignment)이나 절차적 코드에서 사용되어서는 안 된다.
-인자가 체커로 전달되어 범위(range)로 사용되는 경우, 해당 인자는 반드시 상수 표현식(constant expression)이어야 한다.
 
-이는 프로퍼티/시퀀스에서 형식 인자를 사용하는 방식과 유사하며, 어써션 표현식은 재작성 알고리즘(rewrite algorithm) 적용 이후에도 반드시 유효해야 한다.
 
-Notes on casting
+이 접근법은 체커를 분리된 유닛으로서 선언한다. 기능적으로 독립되고 독립적으로 컴파일 될 수 있다.
+이 체커는 인자를 포함하며 따라서 유닛 외부 변수, 파라미터, 상수로의 어느 참조도 만들지 않는다. 이 방법은 형식인자를 선언해야 하는 비용과 체커 인스턴스화나 디자인으로 바인드 시 실인자를 전달하는 비용이 있으나 독립적인 재사용 가능한 체커를 만든다.
 
-표현식은 const cast를 사용하여 상수로 취급될 수 있다. 절차적 동시 어써션(procedural concurrent assertion)에서 const cast된 표현식의 샘플된 값은 현재 값이다. 반면, const cast 없이 프로시저에서 선언된 constant 변수는 샘플링된 값이 사용된다.
-표현식을 constant로 캐스팅하더라도, 캐스팅되는 표현식의 타입은 변경되지 않고 그대로 유지된다. 단지 해당 값이 그 타입의 const 변수로 정의된 것처럼 취급될 뿐이다.
-미리 정의된 타입으로 캐스팅할 경우, 캐스트 접두사는 해당 내장 타입 키워드를 사용해야 한다. 예: int'(2.0 * 3.0), shortint'({8'hFA, 8'hCE})
-사용자 정의 타입으로 캐스팅할 경우, 캐스트 접두사는 해당 사용자 정의 타입의 식별자를 사용해야 한다.
+규칙: RTL신호명으로의 계층적 참조는 자립적이고 독립적인 체커 내부에서 허용되지 않는다. 신호명은 인자로서 체커로 전달될 수 있다.
 
-규칙: 체커의 실 output 인자는 variable_lvalue(변수) 또는 net_lvalue(넷)이어야 한다. 체커 인스턴스화는, 체커의 output 형식 인자로부터 대응되는 실인자로의 계속적 할당이 존재하는 것처럼 취급되며, 이는 reactive region에서 실행된다.
-또한 체커의 형식 인자는 모듈 포트와 유사한 방식으로 실인자와 연결될 수 있다.
+가이드라인: 독립적이고 가능한한 큰 검증 객체의 정의를 위해 분리되어 선언된 체커를 사용하라.
+Bind의 사용은 RTL과 사용시 권장된다. // 디자인 코드로부터 검증 코드를 분리하기 때문
 
-포트 순서에 따른 위치 기반 연결(positional connection)
-완전히 명시된 연결을 사용하는 명명된 포트 연결(named connection)
-암묵적 연결을 사용하는 명명된 포트 연결
-와일드카드 포트명(.*)을 사용하는 명명된 포트 연결
-
-규칙: 모듈과 달리, 체커는 파라미터를 허용하지 않는다. 범위를 나타내는 실인자는 반드시 상수 표현식이어야 한다. 만약 형식 인자가 untyped이고 범위의 상한값으로 사용되는 경우, 해당 실인자는 무한 심볼 $을 사용할 수 있다.
-
-가이드라인: 체커는 파라미터를 지원하지 않으므로, 형식 인자를 통해 사용자 정의 범위를 전달하고, 이들 인자에 기본값(default value)을 설정하는 것이 바람직하다. 또한 패키지는 top-level이나 체커 내부에서 import하여 사용할 수 있다.
-
-package counter_pkg; 
-//timeunit 1ns; timeprecision 100ps;
-`define TOP counter_tb
-const int MAX_COUNT=9, MIN_COUNT=2;
-typedef enum {CT_LOAD, CT_RESER, CT_WAIT, CT_DONE} ct_scen_e;
-endpackage
-
-checker cntr_chk(
-    input logic[3:0] data_in,
-    input logic ld,
-    input logic[3:0] counter,
-    input logic clk, rst_n,
-    output logic[3:0] vout);
-    import counter_pkg::*;
-    int cover_count, fail_count, vtest;
-    default disable iff !rst_n;
-    default clocking cb_clk @(posedge clk); endclocking
-    ap1 : assert #0 (data_in != 0);
-    ap2 : assert final (counter != 0);
-    always_ff @(posedge clk) begin
-        ap_data_in_size: assert property(ld |-> counter == data_in);
-    end
-    assign vout=data_in; // output으로 할당
-    assign vtest= vout; // 지역 변수로 할당.
-    property p_load;
-    logic[3:0] v_data_in;
-    (ld, v_data_in=data_in) |=> counter==v_data_in;
-    endproperty : p_load
-    ap_load : assert property (p_load); //동시 어써션
-    ap_count : assert property(
-        disable iff(!rst_n || ld)
-        (counter != MAX_COUNT) |=> counter==$past(counter)+1'b1);
-
-    ap_hold : assert property(
-        disable iff(!rst_n || ld)
-        counter==MAX_COUNT |=> counter==$past(counter));
-
-    ap_min_load : assume property(
-        ld |-> not(data_in <MIN_COUNT));
-
-    ap_max_load : assume property(
-        ld |-> not(data_in> MAX_COUNT))
-    cover_count++; else fail_counter++ ;
-
-    ap_stable8 : assume property(disable iff(!rst_n ||ld)
-        $stable(counter) |-> ##[1:8] !$stable(counter));
-
-    ap_reset_ok2 : assert property(
-        disable iff(0)
-        !rst_n |=> counter==MIN_COUNT);
+checker c(event clk_ev, // 체커가 자립적임
+.....);
+  ...
 endchecker
+module m;
+...
+c c_static_inst(posedge clk, ...); //체커가 검증모듈에서 사용됨
+always @(posedge clk) if(a) c c_proc(posedge clk...); // V
+endmodule
 
-module counter_max #(MAX_COUNT=9, MIN_COUNT=2)( //파라미터 포트 리스트
-    input logic[3:0] data_in,
-    input logic ld,
-    output logic[3:0] counter,
-    input logic clk, rst_n);
+module rtl(...);
+..//no checker instances
+endmodule
 
-logic[3:0] v;
-apOK : assert #0 (data_in <= MAX_COUNT);
-checker cntr_chk2(input logic[3:0] data_in); //체커 선언
-        ap1 : assert #0 (data_in <= MAX_COUNT);  //즉각적 지연된
-          // assert (data_in <= MAX_COUNT); // 불법
-endchecker
+module top;
+bind rtl c_c1(posedge clk, ...); // V 체커를 검증 모듈에서 DUT로 bind
+... 
+endmodule
 
-always @(posedge clk) begin : counter1
-      if(!rst_n) counter <= MIN_COUNT;
-      else if (ld && data_in >= MIN_COUNT && data_in <= MAX_COUNT) begin : if1
-      counter <= data_in;
-      cntr_chk2 chk2(data_in); //절차적 체커 인스턴스
-      ap3 : assert (data_in <= MAX_COUNT);
-      end : if1
-    else if (!ld && counter != MAX_COUNT) begin : counter2
-    counter <= counter +1'b1;
-    end : counter2
-end : counter1
 
-cntr_chk cntr_chk1(data_in, ld,
-                   counter, clk, rst_n, v); // statuc 체커 인스턴스
-endmodule : counter_max
+
+DUT로의 체커 바인딩은 시뮬레이션동안 테스트벤치 안에서부터 완료될 수 있다.
+하지만 형식 검증은 테스트벤치를 요구하지 않는다. 이런 경우, 바인딩은 root 레벨에서 될 수 있다.
+
+bind dut2 unit_chk my_checker1 (posedge clk, x, y, a, b);
+module dut2(input clk, a, b);
+bit x, y=1;
+//....
+endmodule : dut2
