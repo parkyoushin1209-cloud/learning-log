@@ -1,42 +1,30 @@
-이 스타일 모임은 디자인 유닛 내 검증 코드와 관련된다.
-이는 체커가 검증 코드를 하나의 단위로 묶어주며, 그 단위가 설계 유닛과 연관성을 가지면서 설계의 변수, 파라미터, 상수, 함수에 직접적으로 접근할 수 있는 스코프 가시성을 제공한다는 장점을 가진다.
-함수는 인자를 통해 체커로 전달될 수 없으나, 체커로 가져온 패키지에 선언된 함수일 때 패키지를 통해 접근될 수 있다
-이 방밥의 단점은 재사용성과 검증 코드를 디자인 코드로부터 분리되게 만들지 않는 원인이다.
-RTL코드로부터 검증 코드의 분리는 중요하며 이는 검증 코드를 수정할 때 RTL을 방해하지 않을 수 있기 때문이다.
+이 방식은 관련된 검증 코드를 패키지 내부로 묶는다. 따라서 체커의 라이브러리를 생성한다. 
+체커가 패키지 변수, 파라미터, 상수, 함수로의 직접적 스코프 가시성을 가진다는 장점을 가진다. 또한 체커를 통해 패키지 안에 어써션 선언도 가능하다. 
+패키지 안에서는 checker 내부에 있을 때만 어써션을 선언할 수 있다. 체커는 검증 유닛으로의 패키지 first importing 후 필요한 체커 인스턴싱을 통해 인스턴스화될 수 있다.
 
-import uvm_pkg::*;
-`include "uvm_macros.svh"
-module m;
-bit clk, a, b, c;
-bit[1:0] d, e;
-function f(bit[1:0] x);
-return $onehot0(x);
+가이드라인: 관련된 체커를 패키지로 묶기 위해 이 방식을 사용해라.
+package x_pkg;
+bit a, b, c;
+int d, e;
+function automatic bit f(bit a);
+return a;
 endfunction
 
-checker c_inside(); // 체커가 모듈 내부에서 선언됨, 모듈 시설로의 스코프 가시성을 가짐
-ap_static : assert property( @(posedge clk) // 정적 어써션
-                               if(a) b|=> f(d));
-
-always_ff @(posedge clk)
-      ap_proc: assert property( //절차적 어써션
-        if(a) b |=> f(d);
-      )
+checker c_chk(event ev); //체커가 패키지 내부에서 선언됨, 모듈 시설로의 스코프 가시성을 가짐
+always_ff @(e) 
+if(a) b <= f(d);
+property p_bc;
+b |-> ##[1:5] c;
+endproperty : p_bc
+ap_bc : assert property(@(ev p_bc); // 어써션은 패키지 안에 있는 체커 안에서 선언될 수 있다.
 endchecker
+endpackage : X_pkg
 
-c_inside c_static(); // 정적 인스턴시에이션
-
-always_ff @(posedge clk) begin : aly
-          if(c) c_inside c_proc(); //절차적 인스턴시에이션 
-          //c_proc.ap_static 어써션만 if(c) 에 반응할 것임
-          //c_proc.ap_proc은 블럭에서 동작할 것이며 if(c) 에 반응하지 않을 것임
-end : aly 
-
-always @(posedge clk)
-    #1 if (!randomize(a, b, c, d))
-           `uvm_error("MYERR", "This us a randomize error");
-endmodule
-
-가이드라인:
-다른 디자인 유닛 내부에 임베딩 체커 선언을 피해라, 이는 쉽게 재사용할 수 없고 유지보수에 어려운 코드를 만들 수 있다.
-하지만 반드시 사용해야 하는 경우라면, 설계 유닛이 합성 과정에 포함되지 않을 때에만 이러한 체커의 inline 선언을 제한적으로 사용하는 것이 바람직하다. 일반적으로 합성을 위한 설계와 검증 유닛은 분리하는 것이 권장되기 때문이다. 
-이 방법은 체커가 디자인에서 상대적으로 간단하거나 재사용하지 않을 경우에 적용될 수도 있다.
+module m();
+import x_pkg::*;
+bit clk, w, b, z;
+assign x_pkg::a= w && z;
+// ... pkg::b <= ...
+initial forever #10 clk=!clk;
+c_chk c_chk1(posedge clk);
+endmodule : m  
