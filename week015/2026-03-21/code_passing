@@ -1,30 +1,36 @@
-이 방식은 관련된 검증 코드를 패키지 내부로 묶는다. 따라서 체커의 라이브러리를 생성한다. 
-체커가 패키지 변수, 파라미터, 상수, 함수로의 직접적 스코프 가시성을 가진다는 장점을 가진다. 또한 체커를 통해 패키지 안에 어써션 선언도 가능하다. 
-패키지 안에서는 checker 내부에 있을 때만 어써션을 선언할 수 있다. 체커는 검증 유닛으로의 패키지 first importing 후 필요한 체커 인스턴싱을 통해 인스턴스화될 수 있다.
+다음의 예시는 체커를 DUT로 바인딩하는 개념을 설명한다.
+module dut(input bit clk, a, b);
+bit x, y;
+always @(posedge clk) begin
+    x <= !a;
+    y <= b;
+end
+endmodule : dut 
 
-가이드라인: 관련된 체커를 패키지로 묶기 위해 이 방식을 사용해라.
-package x_pkg;
-bit a, b, c;
-int d, e;
-function automatic bit f(bit a);
-return a;
-endfunction
+checker unit_chk(event clk_ev, input bit x, y, a, b); // 독립적으로 컴파일
+always_ff @clk_ev begin
+    ap_xyab: assert property($rose(x) |-> y ##1 a &&& b);
+    $display("x=%b, y=%b, a=%b, b=%b", x, y, a, b);
+end
+endchecker : unit_clk
 
-checker c_chk(event ev); //체커가 패키지 내부에서 선언됨, 모듈 시설로의 스코프 가시성을 가짐
-always_ff @(e) 
-if(a) b <= f(d);
-property p_bc;
-b |-> ##[1:5] c;
-endproperty : p_bc
-ap_bc : assert property(@(ev p_bc); // 어써션은 패키지 안에 있는 체커 안에서 선언될 수 있다.
-endchecker
-endpackage : X_pkg
+module top;
+bit clk_top, a, b, c1, d1;
+initial forever #10 clk_top = !clk_top;
+int r1;
+dut dut1( .clk(clk_top), .a(a), .b(b));
 
-module m();
-import x_pkg::*;
-bit clk, w, b, z;
-assign x_pkg::a= w && z;
-// ... pkg::b <= ...
-initial forever #10 clk=!clk;
-c_chk c_chk1(posedge clk);
-endmodule : m  
+// 체커 바인딩
+bind dut1 unit_chk my_checker1(posedge clk, x, y, a, b); // DUT신호로 연결
+//모든 체커의 실인자들이 dut신호들로 묶임(즉, 인자들과 내부 신호들이 이름으로 연결됨)
+endmodule : top
+//------------------------------------
+ //옵션 2
+ bind dut2 unit_chk my_checker1 (clk, x, y, a, b);
+ module dut2(input bit clk., a, b);
+ bit x, y;
+ always @(posedge clk) begin
+    x<=!x;
+    y<=!a;
+ end
+ endmodule : dut2
