@@ -1,17 +1,7 @@
-프로세싱 알고리즘은 SystemC 같은 모델링 언어에서 수도 코드로서 볼 수 있는 알고리즘이 있는 요구사항 문서에서 자주 명시된다.
-요구사항: CPU 명령어 Filter가 동작할 때, 이미지 프로세싱 서브시스템은 요구 사항 문서에서 식별되는 로드된 이미지(Filter 함수로서 묘사된)에 대해 Filter 알고리즘을 수행해야 한다. 384X288 픽셀의 프레임 사이즈에서 Filter 동작은 1000 사이클보다 적게 수행되어야 한다.
-
-SVA 프로퍼티 정의
-property pFilterProcessing;
-    xaction.do_Filter_cmd && image_processor.scene_loaded |->
-         ## [*0:1000]  image_processor.done_Filter; // image_processor는 image_processor 서브시스템
-endproperty : pFilterProcessing
-property pFilterProcessingCheck;
-       image_processor.done_Filter  |->
-               image_processor.Filter_scene == Filter(xaction.sent_scene);
-endproperty : pFilterProcessingCheck
-property pHotPointResults;
-    xaction.get_Filter_hotpoints_cmd  |-> ## [0:100]
-          Filter_compare (result.hotpoints_array,
-                              Filter_hotpoints(xaction.sent_scene));
-endproperty : pHotPointResults
+인터페이스 어써션은 형식적인 방식으로 인터페이스의 프로퍼티와 블랙박스 프로토콜을 나타낸다. 공통 인터페이스의 어써션은 재사용을 용이하게 하기위해 체커로 묶여야한다.
+이러한 어써션은 문서화, 이해, 인터페이스의 명확성에서 도움이 될 뿐만 아니라, I/O 인터페이스 레벨에서 디자인의 검증 메커니즘도 제공한다.
+이상적으로 이러한 프로퍼티는 RTL 설계자보다는 요구사항으로부터 검증 엔지니어에 의해 정의될 필요가 있다. 이는 구현동안 만들어진 요구사항으로 인해 발생할 수 있는 오해를 방지한다. 
+하지만 어떠한 고유 가정들도(ex. 인터페이스 부분집합의 사용) 인터페이스 가정으로서 포착되어야 한다. 
+다른 RTL블록의 통합동안, 이러한 블록 레벨 가정은 개개의 블록 동작에 대한 수호자로서 동작할 수 있다.
+인터페이스와 함께 다루는 동안 고려되어야 할 다른 가장 중요한 측면은 인터페이스 기능적 커버리지며 이는 시뮬레이션동안 다양한 시퀀스, 프로퍼티가 테스트됨을 보장하기 때문이다.
+인터페이스 어써션을 추가하는 이점은 시스템 수준 시뮬레이션에서 실패한 시뮬레이션의 디버깅 속도를 향상시킨다는 점이다. 이는 인터페이스 어써션이 문제의 발생 지점인 블록 경계에 가장 가깝게 위치하는 경향이 있기 때문이다(문제는 인터페이스 프로토콜 관련 문제때문이라고 가정)
