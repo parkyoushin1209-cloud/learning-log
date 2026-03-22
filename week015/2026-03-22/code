@@ -1,10 +1,17 @@
+프로세싱 알고리즘은 SystemC 같은 모델링 언어에서 수도 코드로서 볼 수 있는 알고리즘이 있는 요구사항 문서에서 자주 명시된다.
+요구사항: CPU 명령어 Filter가 동작할 때, 이미지 프로세싱 서브시스템은 요구 사항 문서에서 식별되는 로드된 이미지(Filter 함수로서 묘사된)에 대해 Filter 알고리즘을 수행해야 한다. 384X288 픽셀의 프레임 사이즈에서 Filter 동작은 1000 사이클보다 적게 수행되어야 한다.
 
-
-지연은 반응 시간을 식별하기 때문에 요구사항 문서에서 중요하다. 예를 들어
-요구사항: AHB클럭과 동기화된 256 word AHB_bus 전송이 PCI 클럭의100~500사이클 내에서 PCI_bus에 이어져야함
-SVA property 정의: 
-property pAhb2PCIxfr;
-   @(posedge ahb_clk)  (xaction.send256to_pci) |=>
-                      @(posedge pci_clk)  ## [100:500] (pci_start_xfr);
-endproperty : pAhb2PCIxfr
-
+SVA 프로퍼티 정의
+property pFilterProcessing;
+    xaction.do_Filter_cmd && image_processor.scene_loaded |->
+         ## [*0:1000]  image_processor.done_Filter; // image_processor는 image_processor 서브시스템
+endproperty : pFilterProcessing
+property pFilterProcessingCheck;
+       image_processor.done_Filter  |->
+               image_processor.Filter_scene == Filter(xaction.sent_scene);
+endproperty : pFilterProcessingCheck
+property pHotPointResults;
+    xaction.get_Filter_hotpoints_cmd  |-> ## [0:100]
+          Filter_compare (result.hotpoints_array,
+                              Filter_hotpoints(xaction.sent_scene));
+endproperty : pHotPointResults
