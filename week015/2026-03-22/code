@@ -1,20 +1,10 @@
-많은 서브-시스템 레벨 요구사항은 보통 원인-효과 관계로서 표현될 수 있다.
-시스템베릴로그에서, 원인은 antecedent로 효과는 consequent로 불린다.
-예를 들어
-Requirement: 설계가 pyro X를 발사하라는 명령을 받으면, 5사이클 이내에 pyro X 릴레이가 활성화되어야 한다.
 
-SVA property definition:
-property pRFirePyro;
-   @(posedge clk) xaction.Fire_PyroX_CMD==FIRE  |->
-                    ## [1:5] pyro_sub.PyroX_relay==ACTIVATED;
-endproperty : pFirePyro
-요구사항의 프로퍼티가 간결하고 읽기 쉬운 방식(SVA등으로)으로 표현될 때, 이러한 프로퍼티들의 검토 프로세스는 직면하지 않을 수도 있는 중요한 문제를 가져오것을 의도한다. 
-예를 들어, 이 프로퍼티를 위해 안전성은 중요한 문제이다. // 이는 오발사라는 부적절함을 가질 수 있기 때문이다.
-추가된 안정성과 함께, 이 프로퍼티를 안전 전제 조건과 향상시킬 수 있다.
-property pRFirePyroSafe;
-   @(posedge clk) xaction.Fire_PyroX_CMD==FIRE  && 
-    pyro_sub.power_stable  &&
-    pyro_sub.reset_cycle== DONE &&
-   pyro_sub.armed == OK   |->
-                    ## [1:5] pyro_sub.PyroX_relay==ACTIVATED;
-endproperty : pFirePyroSafe
+
+지연은 반응 시간을 식별하기 때문에 요구사항 문서에서 중요하다. 예를 들어
+요구사항: AHB클럭과 동기화된 256 word AHB_bus 전송이 PCI 클럭의100~500사이클 내에서 PCI_bus에 이어져야함
+SVA property 정의: 
+property pAhb2PCIxfr;
+   @(posedge ahb_clk)  (xaction.send256to_pci) |=>
+                      @(posedge pci_clk)  ## [100:500] (pci_start_xfr);
+endproperty : pAhb2PCIxfr
+
