@@ -1,93 +1,132 @@
-1. 프로퍼티 선언 및 사용
-프로퍼티는 module, checker, interface, program에서
-→ 선언 및 인스턴스화 가능
-프로퍼티는 package, clocking block에서
-→ 선언만 가능 (인스턴스화 불가)
-동시 assertion은
-→ task, function, class method 내부에서 사용 불가
-2. 프로퍼티 형식 인자
-명명된 프로퍼티의 typed 형식 인자는 다음을 허용:
-property
-sequence
-event
-그 외 sequence에서 허용되는 타입
-프로퍼티/시퀀스의 형식 인자는
-→ 기본적으로 input 방향
-⚠️ 지역 변수(local variable)는 방향 개념이 없음
-프로퍼티 타입 형식 인자는
-→ |->, |=>의 선행 표현식으로 사용 불가
-(선행은 sequence만 가능)
-3. 클럭킹 이벤트
-하나의 assertion은
-→ 여러 클럭킹 이벤트를 가질 수 있음
-그러나
-→ 선행 클럭킹 이벤트는 반드시 하나만 존재
-선행 클럭킹 이벤트가 생략된 경우
-→ default clocking 또는 context에 의해 추론됨
-(반드시 posedge/posedge일 필요 없음)
-4. disable iff
-disable 조건은
-→ 0 또는 1을 반환하는 간단한 표현식
-disable iff는
-→ assertion의 최상위(top level)에 위치해야 함
-5. default disable
-default disable iff는
-→ 하나의 scope에서 한 번만 정의 가능
-정의된 경우
-→ 해당 scope의 모든 동시 assertion에 자동 적용
-⚠️ 중복 선언은 허용되지 않음 (에러 발생 가능)
-6. 작성 가이드라인
-not property 연산자 남용 금지
-특히 sequence, until, eventually와 함께 사용 시
-→ 해석이 매우 어려워짐
-항상 0으로 평가되는 후속 조건 사용 금지
-형식 검증에서 성공 증명이 불가능
+Q1. property와 sequence의 차이를 설명하고,
+왜 |->, |=>의 선행 표현식에는 sequence만 사용 가능한지 설명하시오.
 
-다음 형태 사용 지양
+A. property와 sequence의 차이는 sequence는 시간적 패턴의 매칭 여부를 나타내는 반면, 
+property는 이러한 패턴을 기반으로 검증 결과를 판단한다는 점이다. 
+또한 property는 vacuous success를 가질 수 있다.
+선행 표현식에는 검증의 시작 시점을 정의해야 하므로 시간적 패턴을 표현하는 sequence만 사용 가능하며, property는 이미 평가 결과를 가지므로 선행으로 사용할 수 없다.
 
-not (sequence_a ##0 sequence_b)
-의미 불명확 + vacuity 문제 발생 가능
-vacuity 방지를 위해
-iff 연산자의 LHS/RHS에 sequence 사용 권장
-7. 시퀀스 지연 표현
-##0 → 같은 사이클
-##1 → 다음 사이클
-8. Temporal Operators
-nexttime[k] property_expr
-→ k 사이클 후 평가
-always[cycle_delay_range]
-→ 지정 구간 동안 항상 만족
-eventually
-기본적으로 unbounded range (##[0:$])
-bounded/unbounded 모두 사용 가능
-9. case property
-case item의 결과는
-→ 각 프로퍼티의 평가 결과
-default가 없고
-→ 어떤 case도 선택되지 않으면
-→ vacuous success 발생
-10. accept / reject / abort
-accept_on, reject_on,
-accept_on_sync, reject_on_sync
-특징
-disable iff와 달리
-→ preponed region에서 샘플링
-triggered, matched 사용 불가
-left → right 순서로 평가
-샘플된 값 함수 사용 가능
-지역 변수 참조 불가
-abort 조건이 참이면
-→ 즉시 강제 종료
-여러 개 중첩 사용 가능
-결과
-accept 계열 → vacuous success
-reject 계열 → vacuous failure
-11. 주요 연산자
-논리 연산:
-and, or
-조건/제어:
-disable iff, iff, implies
-시간 연산:
-until, nexttime, always, eventually
-제어 종료:
-accept_on, reject_on
+
+
+
+Q2. 동시 assertion에서 clocking event의 역할을 설명하고,
+하나의 assertion이 여러 clocking context에서 동시에 평가될 수 없는 이유를 설명하시오.
+
+A. 동시 assertion에서 클럭킹 이벤트는 assertion의 평가를 특정 시점에 동기화하고, 시퀀스 및 프로퍼티 평가의 시작 시점을 정의하는 역할을 한다. 
+또한 assertion은 하나의 클럭킹 이벤트를 기준으로 시간 흐름이 정의되며, 이 시간 흐름을 기반으로 시퀀스의 지연 연산자(##) 등이 해석된다. 
+만약 하나의 assertion이 여러 클럭킹 문맥에서 동시에 평가된다면 시간 기준이 모호해지고, 시퀀스의 의미가 불명확해지므로 assertion은 하나의 클럭킹 context에서만 평가되어야 한다.
+
+
+
+
+Q3. disable iff와 accept_on / reject_on의 차이를
+샘플링 시점과 동작 방식 관점에서 비교 설명하시오.
+
+A. disable iff와 accept_on / reject_on은 모두 assertion의 평가를 중단시키는 조건이지만, 동작 방식과 샘플링 시점에서 차이가 있다.
+
+먼저 disable iff는 현재 값(current value)을 기준으로 평가되며, 조건이 참이 되면 assertion의 평가를 즉시 중단하고 해당 시점의 평가를 무효화한다. 
+이는 비동기적으로 동작하며 assertion의 전체 evaluation을 취소하는 역할을 한다.
+
+반면 accept_on과 reject_on은 preponed region에서 샘플된 값을 기준으로 동작하며, 조건이 만족되면 assertion을 강제로 종료한다. 
+이때 accept_on은 vacuous success를 발생시키고, reject_on은 vacuous failure를 발생시킨다.
+
+따라서 disable iff는 assertion의 평가 자체를 비동기적으로 중단시키는 반면, accept_on / reject_on은 샘플된 값을 기반으로 동기적으로 평가 결과를 강제 결정한다는 차이가 있다.
+
+
+
+Q4. vacuous success란 무엇인지 설명하고,
+다음과 같은 상황에서 vacuous success가 발생하는 이유를 설명하시오.
+
+a |-> b
+
+(단, a가 한 번도 발생하지 않는 경우)
+
+A. vacuous success란 assertion이 실제로 검증 조건을 확인하지 않았음에도 불구하고 참으로 평가되는 경우를 의미한다. 
+이는 주로 implication(|->, |=>)에서 선행 조건(antecedent)이 거짓일 때 발생하며, 이 경우 후행 조건이 평가되지 않아도 assertion은 참으로 간주된다. 
+또한 accept_on과 같은 연산자에 의해 강제로 vacuous success가 발생할 수도 있다.
+
+주어진 예제에서 a가 한 번도 발생하지 않는 경우, implication의 선행 조건이 항상 거짓이므로 후행 조건 b는 평가되지 않으며, 
+그 결과 assertion은 vacuous success가 된다.
+
+
+
+Q5. 다음 시퀀스에서 first_match를 사용하지 않을 경우 발생할 수 있는 문제를 설명하시오.
+(a ##[1:5] b) ##1 c
+
+
+A. 주어진 시퀀스에서 first_match를 사용하지 않을 경우, a ##[1:5] b 구간에서 b가 여러 시점에서 만족되면 각각에 대해 독립적인 스레드가 생성된다. 즉, 여러 개의 b 매치가 동시에 존재할 수 있다.
+
+이 상태에서 ##1 c가 이어지면, 각 스레드는 자신이 매치된 b 시점을 기준으로 다음 사이클에서 c를 평가하게 된다. 따라서 하나의 assertion에서 여러 개의 평가 경로가 동시에 존재하게 된다.
+
+이로 인해 어떤 스레드는 c를 만족하여 성공하고, 다른 스레드는 c를 만족하지 못해 실패할 수 있으며, 결과적으로 assertion의 의도와 다르게 동작하거나 예상보다 느슨한 조건으로 평가될 수 있다.
+
+first_match를 사용하면 가장 먼저 만족되는 b만을 선택하여 하나의 스레드만 생성되므로, 이후의 c 평가 기준이 명확해진다.
+
+
+
+Q6. liveness property와 safety property의 차이를 설명하고,
+각각의 예를 assertion 형태로 작성하시오.
+
+A. liveness property는 어떤 조건이 만족되면 이후에 특정 사건이 언젠가는 반드시 발생해야 함을 나타내는 property이다. 
+즉, 시간이 얼마나 걸리더라도 결국 해당 조건이 만족되어야 한다는 의미를 가진다.
+
+반면 safety property는 특정 조건이 발생하지 않아야 함을 나타내며, 시스템이 잘못된 상태로 진입하지 않음을 보장하는 property이다.
+
+예를 들어 liveness property는 a |-> eventually b와 같이 표현할 수 있으며, 이는 a가 발생하면 이후 언젠가는 b가 반드시 발생해야 함을 의미한다.
+safety property는 a |-> always !b와 같이 표현할 수 있으며, 이는 a가 발생한 이후 b는 절대 발생하지 않아야 함을 의미한다.
+
+
+
+Q7. default disable iff의 동작 범위(scope)와 적용 방식에 대해 설명하고,
+중복 선언 시 어떤 문제가 발생하는지 설명하시오.
+
+A. default disable iff의 scope는 해당 구문이 선언된 module, checker, interface, program과 동일한 scope이며, 각 scope마다 독립적으로 적용된다. 
+이 조건은 해당 scope 내의 모든 동시 assertion에 자동으로 적용된다.
+
+또한 개별 assertion이 별도의 disable iff를 명시적으로 포함하는 경우, 해당 assertion에서는 default disable iff보다 개별 disable iff가 우선 적용된다.
+
+한편 동일한 scope에서 default disable iff를 중복 선언할 경우, 어떤 조건을 적용해야 할지 모호해지므로 이는 허용되지 않으며 컴파일 오류가 발생한다.
+
+
+
+Q8. eventually 연산자의 의미를 설명하고,
+형식 검증에서 이 연산자가 가지는 어려움을 설명하시오.
+
+A. eventually 
+연산자는 어떤 조건이 만족되면 이후에 특정 사건이 언젠가는 반드시 발생해야 함을 의미한다. 
+이는 시간 제한 없이 미래의 어느 시점에서라도 해당 조건이 만족되어야 함을 나타낸다.
+
+형식 검증에서는 시스템의 모든 가능한 실행 경로를 탐색해야 하는데, 
+eventually는 시간의 범위가 무한히 열려 있는 unbounded 특성을 가지므로 검증이 종료되지 않을 수 있다. 
+즉, 특정 사건이 “언젠가” 발생해야 한다는 조건은 무한 시간에 걸쳐 확인해야 하므로, 형식 검증에서 증명하기 어려운 문제가 된다.
+
+
+
+Q9. property 표현식에서 not 연산자의 사용이 제한되는 이유를
+vacuity 및 해석 복잡성 관점에서 설명하시오.
+
+A. property 표현식에서 not 연산자는 temporal expression 전체를 부정하기 때문에 
+sequence, until, eventually와 같은 시간 연산자와 함께 사용될 경우 의미 해석이 매우 복잡해진다. 
+특히 이러한 경우 어떤 시간 경로에서 조건이 만족되지 않아야 하는지를 모두 고려해야 하므로 직관적인 이해가 어렵다.
+
+또한 not 연산자는 vacuity 분석을 어렵게 만들어 assertion이 실제로 검증되었는지 판단하기 힘들게 한다. 
+이러한 이유로 not 연산자의 남용은 가독성과 검증 효율을 저하시킬 수 있으므로 사용을 제한하는 것이 권장된다.
+
+
+
+
+
+Q10. 다음 assertion의 동작을 설명하고,
+의도와 다르게 동작할 수 있는 이유를 설명하시오.
+assert property (@(posedge clk)
+  a ##[1:3] b |-> ##1 c
+);
+
+A. 주어진 assertion은 a가 발생한 이후 1~3 사이클 사이에 b가 발생해야 하며, 해당 b가 발생한 시점을 기준으로 다음 사이클에서 c가 발생해야 함을 의미한다.
+
+이때 a ##[1:3] b 구간에서 b가 여러 시점에서 만족될 경우 각각에 대해 독립적인 스레드가 생성된다. 따라서 여러 개의 평가 경로가 동시에 존재하게 된다.
+
+이후 각 스레드는 자신이 매치된 b 시점을 기준으로 1사이클 후 c를 평가하게 되므로, 일부 스레드는 성공하고 일부 스레드는 실패할 수 있다. 
+이로 인해 assertion이 의도보다 느슨하게 평가되거나 예상과 다른 결과를 초래할 수 있다.
+
+이러한 문제를 방지하기 위해 first_match를 사용하면 가장 먼저 만족되는 b만을 기준으로 하나의 스레드만 생성되어 평가 기준이 명확해진다.
