@@ -1,0 +1,93 @@
+1. 프로퍼티 선언 및 사용
+프로퍼티는 module, checker, interface, program에서
+→ 선언 및 인스턴스화 가능
+프로퍼티는 package, clocking block에서
+→ 선언만 가능 (인스턴스화 불가)
+동시 assertion은
+→ task, function, class method 내부에서 사용 불가
+2. 프로퍼티 형식 인자
+명명된 프로퍼티의 typed 형식 인자는 다음을 허용:
+property
+sequence
+event
+그 외 sequence에서 허용되는 타입
+프로퍼티/시퀀스의 형식 인자는
+→ 기본적으로 input 방향
+⚠️ 지역 변수(local variable)는 방향 개념이 없음
+프로퍼티 타입 형식 인자는
+→ |->, |=>의 선행 표현식으로 사용 불가
+(선행은 sequence만 가능)
+3. 클럭킹 이벤트
+하나의 assertion은
+→ 여러 클럭킹 이벤트를 가질 수 있음
+그러나
+→ 선행 클럭킹 이벤트는 반드시 하나만 존재
+선행 클럭킹 이벤트가 생략된 경우
+→ default clocking 또는 context에 의해 추론됨
+(반드시 posedge/posedge일 필요 없음)
+4. disable iff
+disable 조건은
+→ 0 또는 1을 반환하는 간단한 표현식
+disable iff는
+→ assertion의 최상위(top level)에 위치해야 함
+5. default disable
+default disable iff는
+→ 하나의 scope에서 한 번만 정의 가능
+정의된 경우
+→ 해당 scope의 모든 동시 assertion에 자동 적용
+⚠️ 중복 선언은 허용되지 않음 (에러 발생 가능)
+6. 작성 가이드라인
+not property 연산자 남용 금지
+특히 sequence, until, eventually와 함께 사용 시
+→ 해석이 매우 어려워짐
+항상 0으로 평가되는 후속 조건 사용 금지
+형식 검증에서 성공 증명이 불가능
+
+다음 형태 사용 지양
+
+not (sequence_a ##0 sequence_b)
+의미 불명확 + vacuity 문제 발생 가능
+vacuity 방지를 위해
+iff 연산자의 LHS/RHS에 sequence 사용 권장
+7. 시퀀스 지연 표현
+##0 → 같은 사이클
+##1 → 다음 사이클
+8. Temporal Operators
+nexttime[k] property_expr
+→ k 사이클 후 평가
+always[cycle_delay_range]
+→ 지정 구간 동안 항상 만족
+eventually
+기본적으로 unbounded range (##[0:$])
+bounded/unbounded 모두 사용 가능
+9. case property
+case item의 결과는
+→ 각 프로퍼티의 평가 결과
+default가 없고
+→ 어떤 case도 선택되지 않으면
+→ vacuous success 발생
+10. accept / reject / abort
+accept_on, reject_on,
+accept_on_sync, reject_on_sync
+특징
+disable iff와 달리
+→ preponed region에서 샘플링
+triggered, matched 사용 불가
+left → right 순서로 평가
+샘플된 값 함수 사용 가능
+지역 변수 참조 불가
+abort 조건이 참이면
+→ 즉시 강제 종료
+여러 개 중첩 사용 가능
+결과
+accept 계열 → vacuous success
+reject 계열 → vacuous failure
+11. 주요 연산자
+논리 연산:
+and, or
+조건/제어:
+disable iff, iff, implies
+시간 연산:
+until, nexttime, always, eventually
+제어 종료:
+accept_on, reject_on
