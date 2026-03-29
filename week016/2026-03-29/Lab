@@ -1,24 +1,110 @@
-class Driver_cbs_drop extends Driver_cbs;
-virtual task pre_tx(ref Transaction tr, ref bit drop);
-drop = ($urandom_range(0, 99) == 0);
-endtask
-endclass
+//배열 선언 및 초기화
+int array[5];
+array = '{1,2,3,4,5};
+array[0:2] = '{6,7,8}; // 매칭되는 인덱스 요소 수정
+array = '{4{9}}; //9 4개
+array = '{default:10}; // 모든 요소를 10으로 set
+$display("%p", array); // array 출력
+array1 == array2; // 전체 비교
+array1 = array2; // 전체 복사 
+//다른 사이즈 배열 사이 복사는 컴파일 에러
 
-program automatic test;
-Environment env;
 
+//다이나믹 배열
+int dyn[], d2;
+dyn = new[5];
+d2 = dyn;
+dyn = new[20](dyn);
+dyn = new[100];
+dyn.delete(); // 모든 요소 삭제
+
+
+//큐
+int q[$] = {3,4}; // ' 사용 없음
+q.insert(idx,1); // 요소 idx전 1사입
+q.delete(idx) // idx번 요소 삭제
+q.push_front(elem)
+pop_back, push_back(elem), pop_front
+[$:3] $는 최소값을 의미 [3:$] $는 최대값을 의미
+q = {q, 8};
+q = {}; 요소 삭제
+
+
+//연관 배열
+byte assoc[byte], idx = 1;
+assoc[idx] = idx;
+assoc.first(idx) // 처음 인덱스 획득
+assoc.next(idx); // 다음 인덱스 획득
+assoc.delete(idx); // 첫 요소 삭제
+num, size 함수로 요소 수 찾기 가능
+int power_of_2[int] = '{0:1, 1:2, 2:4};
+idx로서 와일드카드*도 사용 가능하나 비추천 foreach로 타입 유추 힘듦 
+
+
+//어레이 메서드
+1. 어레이 축소 메서드
+byte b[$] = {2,3,4,5};
+b.sum();
+b.product();
+b.and(); // or, xor
+시스템 베릴로그는 배열로부터 랜덤 요소 선택 메서드를 가지지 않음
+다이나믹 배열, 큐에 대해 $urandom_range(array.size()-1)
+고정 배열, 큐, 다이나믹, 연관 배열에 대해 $urandom_range($size(array)-1)
+
+2. 어레이 로케이터 메서드 int형을 반환함 잘못된 타입 선택시 컴파일 못 할 수도 있음
+q.min() q.max(), q.unique();
+d.find with (item > 3);
+d.find_first_index with (~~)
+d.find_first with
+d.find_last with
+d.find_last_index with
+d.sum(x) with
+
+3. 에러이 정렬 및 순서 설정
+d.reverse() d.sort() d.rsort() d.shuffle()
+struct packed {bit [7:0] r, g, b; } c[];
+c = '{'{r:7, g:4, b:9}, '{r:3, g:2, b:9}, '{r:5, g:2, b:1}};
+c.sort with(item.r);
+c.sort(x) with ({x.g, x.b}) // g로 선정렬 후 b로 정렬
+
+
+// 터압 변환
+real'(val); 또는 $cast 이용(범위를 벗어나는 값에 대한 검사도 같이 함)
+
+스트리밍 연산자
+int h;
+bit [7:0] b, g[4], j[4] = '{8'ha, 8'hb, 8'hc, 8'hd};
+bit [7:0] q, r, s, t;
+
+h = { >> {j}}; // int로 팩
+h = { << {j}}; // reverse bit
+h = { << byte {j}}; //reverse byte
+{ >> {g}} = { << byte {j}}; // 배열로 0d 0c 0b 0a 언펙 
+b = { << {8'b0011_0101}}; // reverse bit
+b = { << 4 {8'b0011_0101}}; // reverse nibble
+{ >> {q, r, s, t}} = j; j를 바이트로 흩뿌림
+h = {>>{t, s, r, q}}; 바이트를 인트로 모음
+
+열거형 
+.name() // 상태 이름 반환
+first() 열거형의 첫 번째 멤버 반환
+last()
+next()
+next(N)
+prev()
+prev(N)
+
+
+문자열
+string s;
 initial begin
-    env = new();
-    env.gen_cfg();
-    env.build();
-
-    begin
-        Driver_cbs_drop dcd = new();
-        env.drv.cbs.push_back(dcd);
-    end
-
-    env.run();
-    env.wrap_up();
+    s = "IEEE ";
+    s.getc(0) // I의 아스키 값 
+    s.tolower(); ieee
+    s.putc(s.len()-1, "-"); ' ' -> '-'
+    s = {s, "1800"}; 이어붙임
+    s.substr(2, 5); 2번부터 5번까지
+    $sformatf("%s %5d", s, 42);
+    s1 == s2 // 같으면 1 다르면 0반환
+    s1.compare(s2) //s2보다 크면 1 같으면 0 작으면 -1 반환
 end
-    
-endprogram
