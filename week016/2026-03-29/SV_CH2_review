@@ -58,6 +58,7 @@ d.find_first_index with (~~)
 d.find_first with
 d.find_last with
 d.find_last_index with
+
 d.sum(x) with
 
 3. 에러이 정렬 및 순서 설정
