@@ -1,0 +1,130 @@
+보통 실무에서 검증 환경을 구축할 때 각 파일에 담는 핵심 내용은 다음과 같음
+________________________________________
+1. 설계 및 연결 (Interface & DUT)
+검증 대상(DUT)과 이를 테스트벤치에 연결하기 위한 통로 정의
+
+•fifo_if.sv (Interface): 설계 자산(DUT)과 테스트벤치 사이의 신호 묶음.
+입출력 핀(clk, rst, data_in, data_out 등)을 정의하고, 타이밍을 제어하는 clocking block을 포함
+
+•fifo_rtl.sv (DUT): 실제 검증하려는 로직 코드(RTL)
+
+
+
+2. 데이터 및 설정 (Package & Transaction)
+무엇을 테스트할지, 어떤 데이터를 보낼 지 정의
+
+•fifo_pkg.sv (Package): 프로젝트 전반에서 공통으로 사용할 데이터 타입(typedef), 상수(parameter), 열거형(enum) 등을 모아놓은 패키지
+
+•fifo_xactn.sv (Transaction): "하나의 작업 단위"를 클래스로 정의, 예를 들어 '데이터 0xA를 FIFO에 쓰기'라는 동작을 위해 필요한 변수들과 제약 조건(constraint)을 포함
+
+
+
+3. 검증 컴포넌트 (Transactors)
+데이터를 생성하고, 보내고, 감시하는 '역할군'
+
+•fifo_gen_xactor.sv (Generator): 테스트 시나리오에 맞춰 랜덤하게 트랜잭션(데이터)을 생성
+
+•fifo_cmd_xactor.sv (Driver): 생성된 데이터를 Interface를 통해 실제 하드웨어 신호(High/Low)로 변환하여 DUT에 찔러 넣어줌
+
+•fifo_mon_xactor.sv (Monitor): 인터페이스를 지켜보고 있다가 출력되는 데이터를 가로채서 상위 계층(Scoreboard)으로 전달
+
+
+
+4. 시나리오 및 환경 (Environment & Test)
+전체 검증 시스템을 조립하고 실행하는 곳
+
+•fifo_env.sv (Environment): Generator, Driver, Monitor 등을 하나로 묶고 서로 연결해주는 '조립장'
+
+•fifo_pgm.sv / test.sv (Test): 이번 테스트에서 수행할 구체적인 시나리오를 작성 "데이터를 꽉 채워봐라", "동시에 읽고 써봐라" 같은 지시를 내립니다.
+
+•fifo_props.sv (Assertions): SVA(SystemVerilog Assertions)를 이용해 "FIFO가 꽉 찼을 때는 데이터가 더 들어가면 안 된다" 같은 하드웨어 규칙을 실시간으로 감시
+•
+
+
+
+5. 최상위 파일 (Top)
+•top_tb.sv (Top): 실제 시뮬레이션이 돌아가는 가장 바깥쪽 파일, 클럭(Clock)을 생성하고, DUT와 인터페이스를 인스턴스화하여 최종적으로 연결
+
+________________________________________
+요약
+반도체 검증 환경은 **"관심사의 분리(Separation of Concerns)"**를 위해 파일을 나눕니다.
+1. 무엇을 보낼 것인가? (Transaction)
+2. 어떻게 보낼 것인가? (Driver)
+3. 잘 나왔는지 어떻게 감시할 것인가? (Monitor)
+4. 전체 구조를 어떻게 짤 것인가? (Environment)
+
+
+
+
+<파일 구조>
+top_tb.sv  (최상위)
+│
+├── fifo_if.sv (Interface)
+│       └── DUT와 TB를 연결하는 신호 통로
+│
+├── fifo_rtl.sv (DUT)
+│       └── 실제 검증 대상
+│
+└── fifo_pgm.sv / test.sv (Test)
+        │
+        └── fifo_env.sv (Environment)
+                │
+                ├── fifo_gen_xactor.sv (Generator)
+                ├── fifo_cmd_xactor.sv (Driver)
+                ├── fifo_mon_xactor.sv (Monitor)
+                └── (Scoreboard - 보통 여기에 포함됨)
+                        
++ 공통
+└── fifo_pkg.sv (패키지: 타입, enum, parameter)
+└── fifo_xactn.sv (Transaction 클래스)
+└── fifo_props.sv (Assertions)
+
+
+<데이터 흐름>
+[Generator]
+     │  (transaction 생성)
+     ▼
+[fifo_xactn]
+     │
+     ▼
+[Driver]
+     │  (transaction → 실제 신호로 변환)
+     ▼
+[fifo_if]  ─────────▶  [DUT (fifo_rtl)]
+     ▲                         │
+     │                         │ (출력 데이터)
+     │                         ▼
+[Monitor]  ◀───────────────────┘
+     │
+     ▼
+[Scoreboard / Check]
+     │
+     ▼
+결과 검증
+
+
+
+
+•  Generator
+→ “뭐 할지 결정” (랜덤 데이터 생성) 
+•  Transaction
+→ “작업 단위 정의” (ex: write 0xA) 
+•  Driver
+→ “말을 하드웨어 신호로 번역” 
+•  Interface
+→ “신호 도로” 
+•  DUT
+→ “검증 대상 (FIFO)” 
+•  Monitor
+→ “몰래 지켜보고 기록” 
+•  Scoreboard
+→ “맞는지 비교” 
+•  Environment
+→ “이 모든 걸 묶는 조립장” 
+•  Test
+→ “시나리오 지시하는 감독” 
+•  Top
+→ “시뮬레이션 시작점 + 클럭 생성”
+
+
+Generator → Driver → Interface → DUT → Monitor → Scoreboard
