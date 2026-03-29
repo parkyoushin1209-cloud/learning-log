@@ -23,3 +23,25 @@ resume / suspend 등
 1. 시프트 레지스터 형태 이용
 logic[5:1] = {logic[4:1], current_result} 를 클럭에 동기화되서 동작되도록 하고 확인하거나
 2. triggered를 사용 ##[n:m] ~~ (At sequence) 이후 seq.triggered 이용
+
+
+
+케이스1
+property i2c_switch_mode_p;
+      @(clk_asrt) disable iff(sva_rst_n === 1'b0)
+      ($changed(i2c_mode) && $past(i2c_mode) == INPUT_MODE && i2c_mode == OUTPUT_MODE)
+      |->
+      (i2c_scl === 1'b0);
+    endproperty: i2c_switch_mode_p
+
+케이스2
+property i2c_switch_mode_p;
+      @(posedge clk_asrt) disable iff(sva_rst_n === 1'b0)
+      (i2c_mode === INPUT_MODE) ##1 (i2c_mode === OUTPUT_MODE)
+      |->
+      (i2c_scl === 1'b0)
+    endproperty: i2c_switch_mode_p
+
+첫 번째는 이벤트 트리거 (1회성 체크)
+두 번째는 시퀀스 매칭 (지속 체크)
+
