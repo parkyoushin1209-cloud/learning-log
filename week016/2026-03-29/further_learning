@@ -1,0 +1,25 @@
+process pA;
+fork
+   begin
+       pA = process::self(); // 지금 이 코드를 실행하는 프로세스 객체 반환 = 여기서는 첫번째 begin 블록 
+       processA();
+   end
+   begin
+       processB();
+       pA.kill(); // 방금 저장한 첫 번째 프로세스 강제 종
+   end
+join
+
+시스템 베릴로그에서 fork 하면 
+각각이 독립적인 프로세스(스레드)로 실행됨
+근데 기본적으로는 “다른 프로세스를 제어하기 어려움”
+따라서 다음이 필요함:
+
+특정 프로세스 멈추기 (kill())
+상태 확인 (status())
+resume / suspend 등
+
+어써션에서 어떤 이벤트 A 발생 시 다른 이벤트 B는 ~~사이클 동안 발생했어야 함
+1. 시프트 레지스터 형태 이용
+logic[5:1] = {logic[4:1], current_result} 를 클럭에 동기화되서 동작되도록 하고 확인하거나
+2. triggered를 사용 ##[n:m] ~~ (At sequence) 이후 seq.triggered 이용
