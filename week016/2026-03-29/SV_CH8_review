@@ -1,0 +1,51 @@
+클래스 확장시
+슈퍼 클래스가 인자를 가진다면 확장된 클래스의 생성자에서 부모 클래스의 생성자 함수 호출
+
+<블루프린트 패턴> // 데이터 정의, 생성(보통 gen에)
+여러 개의 트랜잭션을 알 필요 없이 새 블루 프린트를 사용해 여러 트랜잭션 생성 가능
+Generator 코드 수정 없이 동작에 변화를 줄 수 있는 훅
+복사 메서드를 만들어 블루프린트의 복사본을 전송
+블루프린트의 생성과 랜덤화를 분리     
+
+<가상 메서드>
+어떤 가상 메서드를 호출할지 결정하기 위해 핸들의 타입이 아닌 객체의 타입을 사용
+생성자는 가상이 될 수 없음 // 객체가 존재하지 않으므로 참조할 객체가 없음
+
+<콜백> // 동작 개입
+콜백을 사용해 드라이버 클래스 수정 없이 다른 기능을 추가할 수 있음
+(에러 주입, 트랜잭션 드롭, 트랜잭션 지연, 다른 트랜잭션과 이 트랜잭션 동기화, 트랜잭션을 스코어보드에 두기, 기능적 커버리지 데이터 수집)
+
+
+class Driver_cbs_drop extends Driver_cbs;
+virtual task pre_tx(ref Transaction tr, ref bit drop);
+drop = ($urandom_range(0, 99) == 0);
+endtask
+endclass
+
+program automatic test;
+Environment env;
+
+initial begin
+    env = new();
+    env.gen_cfg();
+    env.build();
+
+    begin
+        Driver_cbs_drop dcd = new();
+        env.drv.cbs.push_back(dcd);
+    end
+
+    env.run();
+    env.wrap_up();
+end
+    
+endprogram
+
+
+<기타>
+randc는 전부 반복 전까지 됐었던 값은 반복 x
+같은 이름의 constraint가 서브클래스에 있다면 슈퍼클래스의 제약은 덮어쓰기됨
+추상 클래스는 class 앞에 virtual 붙히기
+파라미터화된 클래스들을 관리하기 쉽게 하기 위해 슈퍼 클래스를 파라미터화되지 않은 클래스로 만들고 확장 시킬 때 파라미터화하기
+$typename(T) : int, real같은 파라미터 타입명 반환
+$bits() : 파라미터의 비트폭 반환
