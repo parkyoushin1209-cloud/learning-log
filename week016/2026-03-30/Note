@@ -1,0 +1,309 @@
+커버리지 타입
+코드 커버리지: 검증 플랜이 아니라 디자인 명세의 구현이 어느정도로 실현되었는지 측정 
+라인 커버리지(얼마나 많은 코드 라인이 실행되었는지)
+Path 커버리지(어떤 경로와 어떤 표현식이 실행되었는지)
+Toggle 커버리지(어떤 단일 비트 변수가 값으로 0 또는 1을 가졌는지)
+FSM 커버리지(상태 머신에서 어떤 상태와 어떤 천이가 발생했었는지)
+
+기능적 커버리지
+디자인 명세는 기기가 어떻게 작동할지를 보여주고 검증 플랜은 어떻게 그 기능들이 자극되고 검증되며 측정될지를 보여줌
+
+버그 비율
+새로운 버그가 발생되는 비율을 확인하는 간접적인 커버리지 측정 방식
+여러 요소에 따라 버그 발생 비율이 달라질 수 있음(초기 검증 때 가장 많이 발생할 것이고, 검증 엔지니어가 달라지는 등)
+버그 발생 비율이 줄어들었다면 다른 자극 방식 구상
+
+어써션 커버리지
+어써션은 디자인과 신호 사이의 관계를 일회 또는 여러 주기동안 검사하는 선언적 코드이며 이는 설계, 테스트벤치와 시뮬레이트 되거나 형식 툴에 의해 증명될 수 있음
+1. 상호 베타적인 신호 또는 인과관계 사이의 신호와 같은 두 신호에 대한 에러
+2. 중재적 알고리즘(FIFO, 또는 다른 하드웨어)
+3. 흥미로운 신호 값 또는 디자인 상태(성공적인 버스 트랜잭션 등)
+을 검사함
+커버 프로퍼티는 신호의 시퀀스를 관찰하는 반면 커버 그룹은 시뮬레이션동안 데이터 값과 트랜잭션을 샘플링
+
+기능적 커버리지 전략
+1. 데이터가 아닌 정보를 수집
+가능한 조합은 무수히 많을테고 이들 전부를 관찰하는 것은 비효율적
+예시로 FIFO에서 full, empty같은 코너 케이스를 관찰 또는 모든 비트가 1 또는 0인 값에 대해 관찰 // 이는 FIFO 사이즈에 무관함
+매우 큰 범위의 설계 신호는 더 작은 범위로 나누고 코너 케이스로 나뉘어야 함
+
+2. 사용할 것만 측정
+기능적 커버리지 수집은 많은 비용 소모 => 분석하고 테스트 향상을 위해 사용할 것만 측정
+시뮬레이션 완료시 데이터베이스는 디스크에 저장됨(여러 테스트 케이스, 여러 시드와 기능적 커버리지 정보, 리포트로 디스크 드라이브를 채움)
+하지만 최종 커버리지 리포트를 안 볼 거면 처음부터 측정하지 말기
+
+3. 완전성 측정
+기능적 커버리지가 높으나 코드 커버리지가 낮음:
+전체 디자인 실행을 안 함 아마 부적절한 검증 계획으로부터 발생했을 것
+하드웨어 명세로 돌아가 검증 계획 업데이트 + 테스트되지 않은 기능을 발견하기 위한 기능적 커버리지 포인트 추가
+
+코드 커버리지가 높으나 기능적 커버리지가 낮음:
+디자인이 명시된 모든 기능을 구현하는지 확인 있다면 테스트가 도달하지 못할 것
+디자인 상태를 추출하고 적절한 자극 생성을 위해 형식 검증 툴이 필요할 것
+
+버그 발생 비율이 낮다면 디자인 블록과 에러 발생기의 새로운 조합 등 다른 접근법 시도
+
+<커버 그룹>
+정의 + instantiation 후 사용
+커버 포인트, 옵션, 형식 인자, 선택적 트리거 포함
+커버그룹명을 최대한 명확하게
+클래스 내부 또는 프로그램 또는 모듈레벨에서 선언 가능//클래스 내부에 있다면 샘플링 전 instantiation 필요, 이 때는 생성시 분리된 이름 불필요
+트랜잭션 같은 데이터 클래스에 선언 x => 과도한 오버헤드 발생 가능
+적절한 추상화 수준에서 정의 필요
+(디자인-TB 사이, 일기/쓰기 데이터 트랜잭터 내부, 환경 설정 클래스 등등 필요한 곳에)
+트랜잭션의 샘플링은 DUT로부터 실제로 받기 전까지 대기해야 함
+여러 개의 커버그룹을 클래스에 둠으로써 필요에 따라 사용 가능
+
+커버그룹 샘플은 sample 함수나 커버그룹에 커버리지 이벤트를 사용해 가능
+콜백 이용도 가능// 커버리지 수집 시 제한 없이 유연한 테스트벤치를 생성할 수 있게 해줌
+
+
+class Driver_cbs_coverage extends Driver_cbs;
+covergroup CovDst7;
+...
+endgroup
+
+virtual task post_tx(ref Transaction tr);
+CovDst7.sample();
+endtask
+endclass
+
+//사용자 정의 샘플 인자 리스트를 가지는 커버 그룹
+covergroup CovDst8 with function sample(bit [2:0] dst, bit hs);
+coverpoint dst;
+coverpoint hs;
+endgroup
+
+covdst.sample(tr.dst, high_speed); 
+
+//이벤트 트리거를 가지는 커버그룹
+event trans_ready;
+covergroup CovDst9 @(trans_ready);
+coverpoint ifc.cb.dst;
+endgroup
+
+
+// SVA를 통해 트리거
+module mem(simple_bus sb);
+bit[7:0] data, addr;
+event write_event;
+
+cover property
+    (@(posedge sb.clk) sb.write_ena==1)
+    ->write_event;
+    endproperty
+endmodule
+
+program automatic test(simple_bus sb);
+
+covergroup Write_cg @($root.top.m1.write_event);
+coverpoint $root.top.m1.data;
+coverpoint $root.top.m1.addr;
+endgroup
+
+Write_cg wcg;
+
+
+initial begin
+    wcg = new();
+    sb.write_ena <= 1;
+    #10000ns $finish;
+end
+endprogram
+
+
+<데이터 샘플링>
+각 값이 얼마나 나왔는지 확인하기 위해 bins이 생성됨
+이 bins는 기능적 커버리지 측정의 기본 단위, 1비트 변수 -> 2개의 bins 생성
+
+<커버그룹 옵션>
+auto_bin_max : 자동적으로 생성할 bins의 개수 명시. 제한된 bins보다 가능한 값이 많으면 bins 개수로 나눔
+
+
+coverpoint tr.dst
+{option.auto_bin_max = 2;} // 자동적으로 생성할 bins 개수 설정
+{bins len[] = {[0:23]};} // 이름 각각 생성 lne_01, len_02 , ....
+{bina misz = default;} // 적히지 않은 범위를 커버함, 하지만 커버리지 계산에는 이용되지 않음
+//마지막 curly brace 후에는 semicolon 없음
+
+
+//조건적 커버리지
+covergroup CovDst21;
+coverpoint tr.dst iff(!bus_if.rst); // 조건을 추가하기 위해 iff 사용 가능 -> 리셋동안 트리거는 무시됨
+endgroup
+
+initial begin // 커버그룹 인스턴스 각각을 제어하기 위해 stop, start 사용 가능
+    CovDst22 ck = new();
+    #1ns ck.stop();
+    bus_if.rst <= 1;
+
+    #100ns bus_if.rst <= 0;
+    ck.start();
+    ...
+end
+
+coverpoint tr.dst{ //천이 커버리지
+    bins t1 = (0=>1), (0=>2), (0=>3); 
+} //(1,2 => 3,4)는 총 4개의 천이와 동치며 (0 => 1 => [*3:4] 2 => 3) 형태도 사용 가능
+
+covwepoinr tr.dst{
+    wildcard bins even = {3'b??0}; 와일드카드 상태 및 펀이
+} // 어떤 x,y, ? 들도 와일드 카드로 사용됨
+
+ignore_bins hi = {6, 7}; // 사용하지 않을 값의 커버리지는 무시되도롯 ignore 사용 가능
+//bins를 명시적으로 또는 auto_bin_max옵션을 이용해 정의하고 ignore 한 경우 커버리지 계산에 기여 안 함
+illegal_bins hi = {6,7}; 
+
+
+//상태 머신 커버리지
+커버그룹이 상태 머신에서 사용되는 경우 특정 상태와 천이를 나열하기 위해 bins 사용 가능
+
+
+크로스 커버리지
+같은 시간동안 발생 한 두 개 이상의 커버포인트 확인 가능
+n개의 값을 가지는 변수와 m개의 값을 가지는 변수에 대해 총 n*m개의 bins 필요
+
+kind : coverpoint tr.kind;
+dst : coverpoint tr.dst;
+cross kind, dst; 
+//크로스 커버리지 리포트 확인 가능
+
+covergroup CovDst34;
+dst : coverpoint tr.dst
+{bins dst[] = {[0:$]};
+}
+kind : coverpoint tr.kind{
+    bins zero = {0};
+    bins lo = {[1:3]}; //zero, hi는 컴파일 타임일 때 존재하는 이름임
+    bins hi[] = {[8:$]}; // hi_1, hi_2는 자동적으로 생성되는 이름이므로 컴파일 타임일 때 사용 불가, 이 이름들은 런타임 또는 리포트 생성시간동안 만들어짐
+    bins misc = default; //ignore_bins에서 사용되려면 컴파일 타임일때 존재하는 이름을 포함해야 함
+}
+cross kind, dst{
+    ignore_bins hi = binsof(dst) intersect {7}; //binsof로 커버포인트를 intersect로 가능한 값의 집합
+    ignore_bins md = binsof(dst) intersect {0} && //binsof는 ()를 intersect는 {}를 사용함
+                     binsof(kind) intersect{[9:11]};
+    ignore_bins lo = binsof(kind.lo);
+}
+endgroup
+
+
+coverpoint의 커버리지 수집 없이 크로스 커버리지에만 사용하고 싶다면 weight를 0으로 설정
+kind : coverpoint tr.kind{
+    bins zero = {0};
+    ....
+    type_option.weight = 0;
+}
+cross kind, dst
+{type_option.weight = 10;} // 가중치를 더 부여할 수도 있음
+
+옵션 타입(커버그룹 전체에 대한 옵션 명시 또는 커버그룹의 인스턴스에 명시되는 옵션)
+인스턴스 명시 옵션은 지역 변수같으며 option 키워드로 명시
+type_option 키워드는 커버그룹으로 묶임(즉, type_option.weight는 이 커버그룹의 모든 인스턴스들에 적용)
+
+//여러 도메인으로부터의 데이터 병합
+신호의 복사본을 만들어 일시적 변수에 저장하고 다른 커버그룹에서 샘플링
+
+크로스 커버리지 대안
+class Sample;
+rand bit a, b; // rand bit로 선언
+endclass
+
+Sample sam;
+
+covergroup CrossBinName;
+a : coverpoint sam.a 
+{bins a0 = {0};
+bins a1 = {1};
+option.weight=0;}
+b : coverpoint sam.b
+    {bins b0 = {0};
+    bins b1 = {1};
+    option.weight=0;}
+
+ab : cross a, b
+   {bins a0b0 = binsof(a.a0) && binsof(b.b0); 또는 bins a0b0 = binsof(a) intersect {0} && binsof(b) intersect {0}; 또는 bins a0b0 = {2'b00};
+    bins a1b0 = binsof(a.a1) && binsof(b.b0);
+    bins b1 = binsof(b.b1); } // wildcard bins b1 = {2'b?1};
+endgroup
+
+커버그룹으로 값으로 인자 전달
+covergroup CovDst39 (int mid);
+...
+bins lo = {[0:mid-1]};
+....
+endgroup
+
+참조로 전달
+covergroup CovDst40 (ref bit [2:0] dst, input int mid);
+coverpoint dst{
+    bins lo = {[0:mid-1]};
+    bins hi - {[mid:$]};
+}
+
+
+커버리지 옵션
+1. per-instance coverage: 여러 인스턴스를 만들어 하나의 커버리지 정보로 모을 수 있음, 이 옵션은 커버포인트, 크로스포인트에는 못 오고 커버 그룹에만 둘 수 있음
+covergroup CoverLength(ref bit [2:0] len);
+coverpoint len;
+option.per_instance = 1;
+endgroup
+
+2. CoverGroup_comment
+코멘트를 추가해 리포트 분석에 용이하게 만들 수 있음
+covergroup CovDst42;
+type_option.comment = "Section 3.2.14 Dst port numbers";
+coverpoint tr.dst;
+endgroup
+
+//여러개의 인스턴스를 갖는 경우 각각에 대해 코멘트 부여 가능
+covergroup CovDst43(int lo, hi, string comment);
+option.comment = comment;
+option.per_instance = 1;
+coverpoint tr.dst
+{bins range = {[lo:hi]};
+ }
+endgroup
+....
+
+CovDst43 cd_lo = new(0, 3, "Low dst numbers");
+CovDst43 cd_hi = new(4, 7, "High dst numbers");
+
+3.Coverage Threshold
+이 bin이 최소 몇 번 이상 hit되어야 커버된 것으로 인정할지 정함
+option.at_least = n;
+커버그룹에서 정의 시 모든 커버 포인트에 적용
+포인트에서 정의 시 포인트에만 적용
+이것만 사용해서는 커버리지 측정을 위한 직접적인 방법은 없음
+
+4.Printing the Empty bins
+기본적으로 커버리지 리포트는 샘플된 bins만 보여줌
+option.cross_num_print_missing = 1_000; //가능한 큰 값으로 설정하되 읽을정도로만
+을 사용해 hit되지 않은 bins도 출력 가능
+
+5. 커버리지 목표
+option.goal = 90;
+//커버리지 목표는 해당 커버그룹, 커버 포인트가 완전히 커버되는 것
+// 이 옵션으로 커버리지 목표를 낮출 수 있으나 바람직하지는 않을 것임
+//커버리지 리포트에만 영향을 미침
+
+커버리지 데이터 분석
+커버 포인트가 0 또는 1번만 샘플되었다면 제약이 모든 영역을 전체적으로 타겟팅하고 있지 않을 수도 있음
+class Packet;
+rand bit[2:0] hdr_len;
+rand bit[3:0] payload_len;
+rand bit[4:0] len;
+constraint length
+{len == hdr_len + payload_len; } 
+=> length가 고르게 분포되게 하고 싶다면 solve len before hdr_len, payload_len; 을 추가
+endclass
+
+
+시뮬레이션 중 기능적 커버리지 확인이 가능하면 커버리지 목표에 도달했는지 검사하고 랜덤 테스트를 제어할 수 있을 것임
+전역 레벨에서 모든 커버그룹의 토탈 커버리지는 $get_coverage로(0~100 사이의 실수 값을 반환하며 모든 커버 그룹을 확인함)
+get_coverage(), get_inst_coverage() 전자는 커버그룹 이름, 인스턴스와 작동해 커버 그룹의 모든 인스턴스에 대한 커버리지 제공
+Covergroup::get_coverage()
+cgInst.get_coverage()
+후자는 특정 커버 그룹 인스턴스에 대한 커버리지만 반환
+cgInst.get_inst_coverage(),+ per_instance 커버리지 수집을 원하면 option.per_instance=1을 명시할 필요 있음
+
+장기간 테스트동안 커버리지를 모니터링할 수 있으며 만약 커버리지 수준이 안 올라간다면 테스트를 중지해야 함(다른 시드나 테스트가 올려줄 것임)
