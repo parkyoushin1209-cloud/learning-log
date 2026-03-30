@@ -1,0 +1,206 @@
+🔷 1. 커버리지 종류 (큰 그림)
+✅ 1) 코드 커버리지 (Code Coverage)
+
+👉 “디자인 코드가 얼마나 실행됐냐”
+
+라인 커버리지: 코드 줄 실행 여부
+Path 커버리지: 실행된 경로
+Toggle 커버리지: 비트가 0↔1 변했는지
+FSM 커버리지: 상태 + 상태 전이
+
+📌 핵심
+
+검증 플랜 기준 ❌
+디자인 구현 확인용 ⭕
+✅ 2) 기능적 커버리지 (Functional Coverage)
+
+👉 “명세된 기능을 제대로 검증했냐”
+
+검증 플랜 기반
+사용자가 직접 정의 (covergroup)
+
+📌 핵심
+
+코드 실행이 아니라
+👉 의도한 기능 검증 여부
+✅ 3) 어써션 커버리지 (Assertion Coverage)
+
+👉 “특정 조건/관계가 실제로 발생했는지”
+
+SVA 기반
+cover property 사용
+
+📌 주로 체크하는 것
+
+신호 간 관계 (ex. req → ack)
+알고리즘 (FIFO, arbitration)
+특정 이벤트 (버스 트랜잭션 성공 등)
+✅ 4) 버그 비율 (Bug Rate)
+
+👉 간접적인 커버리지 지표
+
+버그 발생 속도 감소 → 검증 성숙
+낮아지면:
+👉 새로운 테스트 전략 필요
+🔷 2. 커버리지 해석 전략 (중요 ⭐)
+📌 상황 1
+
+👉 기능적 ↑ / 코드 ↓
+→ 일부 기능만 집중 테스트
+
+✔ 해결:
+
+검증 플랜 수정
+테스트되지 않은 기능 추가
+📌 상황 2
+
+👉 코드 ↑ / 기능적 ↓
+→ 실행은 했지만 의미 없는 테스트
+
+✔ 해결:
+
+기능 기반 커버포인트 추가
+stimulus 개선
+📌 상황 3
+
+👉 버그 안 나옴
+→ 좋은 게 아님
+
+✔ 해결:
+
+새로운 시나리오
+다른 조합
+constraint 변경
+🔷 3. 기능적 커버리지 설계 전략
+✅ 1) “데이터” 말고 “정보”를 수집
+모든 값 ❌
+의미 있는 케이스 ⭕ (corner case)
+
+예:
+
+FIFO → full, empty
+all 0 / all 1
+✅ 2) 필요한 것만 측정
+커버리지 = 비용 큼 (디스크, 시간)
+
+👉 안 볼 거면 만들지 마라
+
+✅ 3) 완전성 확인
+코드 vs 기능적 커버리지 비교 필수
+🔷 4. Covergroup 구조
+📌 기본 구성
+covergroup
+coverpoint
+bins
+option
+(선택) trigger
+📌 선언 위치
+클래스 / 모듈 / 프로그램
+
+⚠️ 주의
+
+트랜잭션 클래스 내부 ❌ (오버헤드 큼)
+📌 샘플링 방식
+1) 직접 호출
+cg.sample();
+2) 함수 인자 방식
+covergroup cg with function sample(int a);
+3) 이벤트 트리거
+covergroup cg @(event);
+4) 콜백 사용
+
+→ 유연한 구조 가능
+
+🔷 5. Bins (핵심 ⭐)
+
+👉 커버리지의 최소 단위
+
+값 분포 측정
+자동 생성 가능
+📌 종류
+✅ 자동 bins
+option.auto_bin_max = 2;
+✅ 명시적 bins
+bins b1 = {1,2,3};
+✅ default bin
+bins others = default;
+
+→ 커버리지 계산 ❌
+
+✅ ignore_bins
+ignore_bins hi = {6,7};
+
+→ 아예 무시
+
+✅ illegal_bins
+illegal_bins hi = {6,7};
+
+→ 나오면 에러
+
+✅ wildcard bins
+wildcard bins even = {3'b??0};
+✅ 천이 bins (Transition)
+bins t1 = (0 => 1);
+🔷 6. 조건 및 제어
+✅ 조건부 커버리지
+coverpoint a iff(!rst);
+✅ start / stop
+cg.start();
+cg.stop();
+🔷 7. 크로스 커버리지
+
+👉 여러 변수 조합 확인
+
+cross a, b;
+bin 개수 = n × m
+📌 제어
+특정 조합 무시
+ignore_bins x = binsof(a) intersect {0};
+📌 weight
+option.weight = 0;
+
+→ 해당 커버포인트 비중 제거
+
+🔷 8. 커버리지 옵션 (중요 ⭐)
+✅ 1) option.at_least
+
+👉 최소 hit 횟수
+
+✅ 2) option.goal
+
+👉 목표 커버리지 %
+
+✅ 3) option.per_instance
+
+👉 인스턴스별 커버리지
+
+✅ 4) type_option.weight
+
+👉 전체 타입에 적용
+
+✅ 5) option.comment
+
+👉 리포트 설명
+
+✅ 6) cross_num_print_missing
+
+👉 안 나온 bin도 출력
+
+🔷 9. 데이터 샘플링 주의점
+DUT에서 실제 데이터 받은 후 샘플링
+여러 도메인 → 복사해서 사용
+🔷 10. 커버리지 확인 방법
+📌 전체
+$get_coverage();
+📌 커버그룹
+cg.get_coverage();
+📌 인스턴스
+cg.get_inst_coverage();
+🔷 11. 실무 핵심 요약 (진짜 중요 ⭐⭐⭐)
+
+👉 좋은 커버리지는 이런 특징 있음
+
+의미 있는 케이스만 측정
+corner case 포함
+코드 + 기능적 균형
+버그가 계속 나오도록 자극 설계
