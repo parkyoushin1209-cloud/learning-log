@@ -1,0 +1,142 @@
+버스 프로토콜이 추가되면 
+1. 트랜잭션 확장
+class BaseTr;
+  rand bit a;
+  rand bit valid;
+  rand bit [31:0] data;
+  rand bit [7:0] addr;
+endclass
+
+2. 인터페이스 확장 
+interface fsm_ifc;
+  logic clk;
+  logic a;
+  logic valid;
+  logic ready;
+  logic [31:0] data;
+  logic [7:0] addr;
+endinterface
+
+3. 드라이버 확장
+virtual task send(BaseTr tr);
+  @(posedge vifc.clk);
+
+  vifc.a     <= tr.a;
+  vifc.valid <= tr.valid;
+  vifc.data  <= tr.data;
+  vifc.addr  <= tr.addr;
+
+  // handshake 예시
+  if (tr.valid) begin
+    wait (vifc.ready);
+  end
+endtask
+
+FSM 정석 2 블록
+// state register //상태레지스터는 순차 논리 
+always_ff @(posedge clk or negedge rst_n)
+  state <= next_state;
+
+// next state logic
+always_comb // 다음 상태 로직은 조합 논리
+  next_state = ...
+=================절대 하면 안 되는 것===================
+  always @(*)에서 state 변경 ❌
+= / <= 섞기 ❌
+default 할당 안 해서 latch 생기는 것 ❌
+
+
+===================드라이버 remind 내용===============
+send()는 task로 만든다
+initial 쓰면 안 됨  (함수, 테스크에서)
+clock 기준으로 동작해야 함
+
+
+
+==================에러 주입 방식========================
+1. 단일 에러 클래스로만 해결하려고 하지 말기 -> 케이스가 많아지면 클래스 수 폭발적
+2. 트랜 잭션 내부에 에러 타입 넣기
+typedef enum {
+  NO_ERR,
+  INVALID_VALUE,
+  TIMING_VIOLATION,
+  PROTOCOL_VIOLATION
+} err_t;
+
+class BaseTr;
+  rand bit a;
+  rand err_t err_type;
+endclass
+3. 드라이버에서 에러 구체화하기
+case (tr.err_type)
+  NO_ERR: begin
+    vifc.a <= tr.a;
+  end
+
+  INVALID_VALUE: begin
+    vifc.a <= 'x;
+  end
+
+  TIMING_VIOLATION: begin
+    @(negedge vifc.clk);
+    vifc.a <= tr.a;
+  end
+
+  PROTOCOL_VIOLATION: begin
+    vifc.valid <= 1;
+    // ready 무시
+  end
+endcase ////에러는 “신호 레벨”에서 터져야 의미 있음
+
+4. function void pre_tx(BaseTr tr);
+  if (tr.err_type == INVALID_VALUE)
+    tr.a = ~tr.a;
+endfunction
+콜백은 에러 동작 수정시에만 메인은 드라이버에
+
+5. Blueprint(상속) 방식은 이렇게 제한적으로 사용
+
+👉 이런 경우에만 추천:
+
+완전히 다른 트랜잭션 구조일 때
+필드 자체가 달라질 때
+class ErrorTr extends BaseTr;
+  rand bit force_illegal_sequence;
+endclass
+
+Randomization 활용해서 에러 비율 제어
+constraint c_err {
+  err_type dist {
+    NO_ERR := 80,
+    INVALID_VALUE := 10,
+    TIMING_VIOLATION := 5,
+    PROTOCOL_VIOLATION := 5
+  };
+}
+
+===========================config 객체 역할=======================
+test
+ └─ env
+     ├─ cfg   ← 설정 (ncell, 에러율 등) + constraint
+     ├─ generator (cfg 참조)
+     ├─ driver
+
+=========================드라이버, 모니터의 인터페이스에서의 레이스 컨디션 방지를 위해 클럭킹 블록을 따로 만들어 사용함)==================
++ DUT에서는 클럭킹 블록을 사용 안 해도 
+interface fsm_ifc(input logic clk);  
+  logic a;
+  logic valid;
+  logic ready;
+
+  // Driver용
+  clocking drv_cb @(posedge clk);  //같은 클럭 사용 다만, 이후에 클럭 사용할 때 반드시 클럭킹 블럭의 클럭 사용 
+    output a, valid;
+    input  ready;
+  endclocking
+
+  // Monitor용 //모니터에서 next_state를 직접적으로 넣어서 관찰하는 것보다 출력 신호를 파악해 상태 파악할 것을 권
+  clocking mon_cb @(posedge clk);
+    input a, valid, ready;
+  endclocking
+
+endinterface
