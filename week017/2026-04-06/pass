@@ -1,1 +1,74 @@
+이산 수학
+World
+	Structure = (E, R, F)// elements, relationship, functions
+	Predicate(elem1, elem2, elem3…..) = proposition // syntax
+	Semantics: T/F
+Ex. s = interges의 요소 자연수, 음의 정수, 0 등이 객체
+Relation = {=, >= , <=, <, >}
+Function = {+ , -, * , /}
+Proposition =(2,2)[문장], 2+3 > 2 = >(2+3, 2) 명제 
+---- semantics : T/F // 현실에서 그 문장이 항상 지켜지는가?
+Symbol : 정수, 등호, 연산자 등
+Loves(C, Y) 
+Odd(10) odd는 property 10은 object
+Pretty(cat) pretty는 property cat은 object
+1. syntax = predicate(e1, e2, …) 2. 2. syntax = quantification
+Quantification 종류 : 
+1. Universal quantification-∀= P(a) and P(b) and P(c) ….. //논의 영역 내 모든 객체에 대해 만족
+2. Existential quantification-∃ = P(a) or P(b) or P(c) ……  //논의 영역 내 이 문장을 만족하는 객체 존재
+ALL , EXIST 한정자, a, b, c는 논의 영역 내 객체
+UD : 논의 영역 Universes of Discourse  
+함수, 변수, 상수로 표현
+
+예시:
+And, not, or, exist, all
+UD = { C, Y, J }
+All x Likes(x, C) : everyone likes C
+= Likes(C, C) and Likes(Y, C) and Likes(J, C)
+Exist x Liles(x, C): someone likes C
+Likes(C, C) or Likes(Y, C) or Liles(J, C) 
+
+1. All x exist y Likes(x, y) : everyone Likes someone
+== All x(exist y Likes(x, y) == All x(Likes(x, C) or Likes(x, Y) or Liles(x, J)) 
+==(Likes(C, C) or Likes(C, Y) or Liles(C, J)) and
+(Likes(Y, C) or Likes(Y, Y) or Liles(Y, J)) and
+(Likes(J, C) or Likes(J, Y) or Liles(J, J))
+
+2. Exist y all x Likes(x,y) : there is a someone who loves everyone
+==(Likes(C, C) and Likes(C, Y) and Liles(C, J)) or
+(Likes(Y, C) and Likes(Y, Y) and Liles(Y, J)) or
+(Likes(J, C) and Likes(J, Y) and Liles(J, J))
+
+3. exist x all y Likes(x,y) : there is some who likes everyone
+4. all y exist x Likes(x, y) : Everyone is liked by someone
+5. All x all y Likes(x, y) : everyone likes everyone
+6. all y all x Likes(x, y) : everyone is liked by everyone //전자를 기준으로 해석
+7. all xy Likes(x, y) : everyone likes everyone
+//5, 6번 등가 증명 시 시그마x 시그마 y 전개 후 순서를 바꿔서 시그마 y 시그마 x와 같아짐을 보이기
+
+파이 x 시그마 y (x,y) => ( y1 + y2 + y3 +….) * (y1 + y2 +….) 형태
+//두 가지 논리만으로 단순하게 표현할 수 있음 새로운 syntax는 불필요
+//새로운 문장을 만드는 새로운 방법 도입하지 마라
+
+Relation 안에 relation 올 수 없음
+문장 : all uos students are smart
+Smart = sintax(x)
+All x Uos(x) -> smart  O
+All x uos(x) and smart(x) X
+All x UoS(x) or smart(x)
+
+UOS(X) : x is UOS student
+Smart(x) : x is smart
+all uos students are smart   All x Uos(x) -> smart
+
+all(smart(UOS(x))) => 쓰지마라
+there are someone who is not UOS student but smart
+exist x not UOS(x) and smart(x)
+// 거의 모든 경우 conjunction을 사용함
+
+
+All x (not (UOS(x) -> smart(x)))
+Exist x (UOS(x) and not smart(x)
+
+All x P(x) == exist x not P(x) //드모르간 정리
 
