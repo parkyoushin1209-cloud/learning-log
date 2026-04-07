@@ -1,0 +1,65 @@
+case (grduation_year)  inside 
+   [1950:1959] ....;
+   [1960:1969] ....;
+   [1970:1979] ....;
+endcase
+
+태스크는 시간 소모 가능 함수는 불가
+함수 호출 후 반환값을 무시하고 싶다면 결과를 void로 캐스트
+void'($fcast(file,"%d", i));
+
+input, output, inout은 스칼라 값만 전달 가능
+ref로 벡터 값 전달//참조에 의한 전달-배열
+ref인자는 자동 저장공간을 가지는 루틴에서만 사용될 수 있음:automatic
+const를 사용할 경우 바꿀 수 없음=> 컴파일러가 루딘티 배열을 변경하지 못하도록 검사함
+ref는 호출자 함수에 의해서도 즉각적으로 보여짐:동시에 실행되는 여러 스레드를 가지고 정보를 전달하는 간단한 방법을 원할 때 유용
+//output은 함수 실행 끝내고 영향을 끼침
+
+함수에서 배열을 조작하고 반환하는 방법
+1. 타입 생성 및 조작해서 반환
+typedef int fixed_array5_t [5];
+fixed_array5_t f5;
+
+function fixed_array5_t init(input int start);
+foreach(init[i])
+  init[i] = i + start;
+endfunction // 배열을 만들어서 복사하므로 배열이 크다면 수행능력 문제로 이어질 수 있음
+
+initial begin
+    f5 = init(5);
+    foreach(f5[i])
+      $display("f[%0d] = %0d", i, f5[i]);
+end
+
+2. 루틴에 참조로 전달
+function automatic void init(ref int f[5], input int start);
+  foreach(f[i])
+    f[i] = i + start;
+endfunction
+
+int fa[5];
+initial begin
+    init(fa, 5);
+    foreach(fa[i])
+      $display("fa[%0d] = %0d", i, fa[i]);
+end
+
+3. 클래스 내부에 배열을 두고 객체의 핸들을 반환
+
+
+automatic 저장공간: 
+태스크는 기본적으로 스택을 사용하므로(모듈, 프로그램 모두에서) 여러 스레드가 서로 간섭하는 일이 발생 가능했고 
+automatic으로 해결 가능하게 함
+
+지역 변수는 선언에서 초기화될 때 실행시간이 아닌 시뮬레이션 시작 전 초기화됨
+지역 변수를 정적으로 초기화할 경우 automatic 사용으로 begin end블록에서 초기화가 진행될 수 있도록 할 수 있음
+또는 선언과 초기화를 분리
+
+`timescale 사용 시 적절한 척도와 정확도를 맞추기 위해 적절한 순서로 컴파일 했어야 했음
+-> timeunit, timeprecision으로 해결 가능
+$timeformat() // $timeformat(1.스케일 요소[-9=ns], 2.출력할 소수점 이하 자리수, 3, 시간 값 이후 출력할 문자열, 4. 최소 필드 폭)
+$time, $realtime 시스템 태스크를 사용해 코드를 시간 인식이 더 잘 되도록 만들 수 있음
+
+time, realtime 변수를 사용해 지연 시간 값을 저장하고 지연 연산자에 사용 가능 time은 64비트 값으로 부동소수점 값을 가지지 못하므로 반올림됨
+
+keypoint: 시간을 사용하지 않은 태스크를 가진다면 반환값이 없는 void 함수를 대신 사용
