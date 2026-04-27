@@ -1,0 +1,68 @@
+최상위에는 uvm_top가 존재(uvm_root) 타입, 싱글톤 인스턴스
+컴포넌트 검색 기능을 제공하며 설정된 db를 저장하는 역할을 함
+
+페이즈 메서드
+new() : 페이즈 메서드는 아님
+build_phase() : 탑다운 방식 호출, 여기서 컴포넌트 구조가 생성됨, 부모 클래스와 다른 동작을 유도하고 싶다면 uvm_component::build_phase 사용
+connect_phase() : TLM 포트 연결, 포인터 참조 할당, 가상 인터페이스 set, get
+end_of_elaboration_phase() : 보통 구성이 끝난 테스트 벤치의 정보를 출력
+start_of_simulation() : 0타임 의존도를 벗어나게 하기 위해 만듦, 컴포넌트 초기화 가능
+run_phase() : 유일한 테스크로 시간 소모 가능 실행이 끝났음을 확인시키기 위해 
+raise_objection, drop_objection을 사용함
+global_stop_requese() - 권장되지 않으며 사용하면 안됨
+또는 kill 메서드를 사용 또는 time-out을 설정했으면 도달 시
+extract_phase() :레지스터에 저장된 값이나 어써션 에러 카운트 수집, 커버리지 정보 추출등
+check_phase() : 이전 페이즈에서 결과 추출 후 이 데이터들을 유효화하거나 전체적인 시뮬레이션 결과 결정에 사용 가능
+report_phase() : 파일이나 화면으로 정보 출력
+
+//필요한 것만 구현하면 됨
+
+get_parent : 부모 클래스 핸들 반환
+get_child : 자식 클래스 핸들 반환
+get_full_name : 현재 컴포넌트까지의 전체 경로 풀네임 반환
+
+`uvm_component_utils(TYPE) : 자동화 매크로를 가지지 않는 간단한 컴포넌트
+`uvm_component_param_utils(TYPE) : `` 파라미터화된 컴포넌트
+`uvm_component_utils_begin(TYPE) : 자동화 매크로 o 간단한 컴포넌트
+`uvm_component_param_utils_begin(TYPE) : `` 파라미터화된 컴포넌트
+=>
+get_type_name, create, 팩토리 등록, get_type, get_object_type 구현
+
+uvm_config_db#(type T =~~)::set/get(cntxt, inst_name, field_name, T value)
+cntxt : 컴포넌트 검색 시작 지점 //this -> 지금 계층부터 설정적용상위에는 uvm_top가 존재(uvm_root) 타입, 싱글톤 인스턴스
+컴포넌트 검색 기능을 제공하며 설정된 db를 저장하는 역할을 함
+
+페이즈 메서드
+new() : 페이즈 메서드는 아님
+build_phase() : 탑다운 방식 호출, 여기서 컴포넌트 구조가 생성됨, 부모 클래스와 다른 동작을 유도하고 싶다면 uvm_component::build_phase 사용
+connect_phase() : TLM 포트 연결, 포인터 참조 할당, 가상 인터페이스 set, get
+end_of_elaboration_phase() : 보통 구성이 끝난 테스트 벤치의 정보를 출력
+start_of_simulation() : 0타임 의존도를 벗어나게 하기 위해 만듦, 컴포넌트 초기화 가능
+run_phase() : 유일한 테스크로 시간 소모 가능 실행이 끝났음을 확인시키기 위해 
+raise_objection, drop_objection을 사용함
+global_stop_requese() - 권장되지 않으며 사용하면 안됨
+또는 kill 메서드를 사용 또는 time-out을 설정했으면 도달 시
+extract_phase() :레지스터에 저장된 값이나 어써션 에러 카운트 수집, 커버리지 정보 추출등
+check_phase() : 이전 페이즈에서 결과 추출 후 이 데이터들을 유효화하거나 전체적인 시뮬레이션 결과 결정에 사용 가능
+report_phase() : 파일이나 화면으로 정보 출력
+
+//필요한 것만 구현하면 됨
+
+get_parent : 부모 클래스 핸들 반환
+get_child : 자식 클래스 핸들 반환
+get_full_name : 현재 컴포넌트까지의 전체 경로 풀네임 반환
+
+`uvm_component_utils(TYPE) : 자동화 매크로를 가지지 않는 간단한 컴포넌트
+`uvm_component_param_utils(TYPE) : `` 파라미터화된 컴포넌트
+`uvm_component_utils_begin(TYPE) : 자동화 매크로 o 간단한 컴포넌트
+`uvm_component_param_utils_begin(TYPE) : `` 파라미터화된 컴포넌트
+=>
+get_type_name, create, 팩토리 등록, get_type, get_object_type 구현
+
+uvm_config_db#(type T =~~)::set/get(cntxt, inst_name, field_name, T value)
+cntxt : 컴포넌트 검색 시작 지점 //this -> 지금 계층부터 설정적용 
+같은 이름일 때 계층적으로 높은 컴포넌트가 이김
+같은 계층 또는 실행시간으로 넘어간 경우 나중에 설정된 게 이김
+inst_name : 컴포넌트 인스턴스로의 계층적 경로 // * -> 하위 모든 경로 , "" -> 하위 경로 없이 현재 경로 자체
+field_name : 설정될 필요가 있는 필드의 이름
+value : 필드에 할당되는 값
