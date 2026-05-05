@@ -1,0 +1,8 @@
+heartbeat은 아직 실행중인 컴포넌트가 있는지 확인하고자 할 때 사용할 수 있으며 다음의 순서로 구현한다.
+1. uvm_callbacks_objection hb_obj => objection 정의 이 objection을 통해 나중에 raise_objection, drop_onjection을 진행할 것임
+2. event 및 uvm_heartbeat 객체 생성 . event.trigger를 통해 heartbeat window를 만들고 간격은 시간 지연을 통해 설정한다.
+3. heartbeat list 생성 uvm_component 타입 큐를 생성해 heartbeat 메커니즘을 적용할 컴포넌트를 이 곳에 저장한다.
+  my_heartbeat.set_heartbeat(event, queue) 및 my_heartbeat.add(component_name) 을 통해 컴포넌트를 큐에 추가한다.
+my_heartbeat.set_mode(UVM_ANY/ALL/ONE_ACTIVE) 하나 이상/ 전부/ 하나만 윈도우동안 heartbeat을 방출해야 함
+  connect 페이즈의 가장 위에서 큐 선언 및 큐에 담기 진행
+heartbeat 종류들은 전부 팩토리의 create이 아닌 new로 생성함
