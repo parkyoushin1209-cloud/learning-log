@@ -1,0 +1,14 @@
+delta cycle
+=> 같은 시간 안에 존재하는 여러 단계
+active , NBA, monitor region ....
+클럭킹 블록은
+DUT 샘플링 시점과 테스트벤치 드라이빙 시점을 의도적으로 분리해줌
+=> input sampling 시점과 output driving 시점을 자동으로 스큐해줌
+=> DUT와 TB 사이 레이스 컨디션을 줄여줌(샘플링, 드라이빙 시점 분리)
++ 누가 구동하고 누가 샘플링하는지 명확해짐(신호 소유권 명확화)
+
+clocking drv_cb @(posedge clk);
+output valid; //보통 TB가 씀
+input ready; // DUT가 씀, TB는 읽기만
+
+endclocking
