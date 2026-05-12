@@ -1,0 +1,16 @@
+uvm 시퀀스 라이브러리는 default 시퀀스로 설정 가능
+field_name에 default_sequence를 넣어주기
+
+시퀀스 라이브러리는 uvm_sequence_library 베이스 클래스에서 파생되며
+파라미터화 되고
+`uvm_object_utils, `uvm_sequence_libarary_utils 매크로를 사용함
+uvm_config_db#(uvm_sequence_lib_mode)를 통해 선택되는 시퀀스 결정 가능
+UVM_SEQ_RAND : 랜덤 ,UVM_SEQ_RANDC : randc와 동일, UVM_SEQ_ITEM : item만 가능, UVM_SEQ_USER : 사용자 정의
+마지막 키워드의 경우
+virtual function void select_sequence() 를 오버라이딩해서 결정 로직을 만들 수 있음
+
+시퀀스 라이브러리에 추가하기 위해 생성자에서
+add_typewide_sequence(seq_inst_name::get_type()) 형식을 사용하거나
+시퀀스 클래스 정의 상단에 `uvm_add_to_seq_lib(sequence_type, seq_library_type)을 명시해서 등록 후
+init_sequence_library() 를 호출해 등록한 시퀀스를 sequences 큐에 추가함
+
