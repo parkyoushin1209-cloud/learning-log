@@ -1,0 +1,30 @@
+함수
+기본적으로 하나의 원소로만 매핑됨
+명제: 사건 -> 진리값, 술어: 객체 -> 명제 또는 진리값 등으로 매핑 가능함
+injective(단사) -1대1 정의역의 원소가 다르면 대응되는 함수값도 서로 다름
+surjective(전사) - onto 공역(codomain)과 치역(range)이 같음(공역의 모든 원소에 대해 함수값이 공역의 값이 되게 하는 정의역의 원소가 존재함)
+bijective(전단사) - one-to-one correspodence 단사 + 전사 
+
+가산 불가산
+  가산: 유한하거나 자연수의 Cardinality(초한수 알레프-제로)와 같음 -> 규칙적인 방식으로 매핑 가능? - 정수 -> 자연수, 자연수 쌍 가능
+  불가산 : 그외의 경우 - 칸토어 대각선 논법
+
+알고리즘
+    특징 
+    1. finiteness
+    2. effectiveness
+    3. generality
+    4. efficiency
+    5. definiteness
+    6. input 7. output
+바이너리 서치, 리니어 서치, 맥스값 서치, 합 등
+수도 코드는 노트 확인
+
+  시간 복잡도 -> 시간이 얼마나 걸리는지 혹은 공간이
+  빅-오 => 상한값 exist c, k : all x > k : abs(f(x)) <= abs(cg(x))
+  리틀-오=> 엄격한 상한값 all c, exist k : all x > k abs(f(x)) < abs(g(x))
+  빅-세타 => 정확한 최대 order 빅-오 ^ 빅-오메가
+  빅-오메가 => 하한값 exist c, k : all x > k : abs(f(x)) >= abs(cg(x))
+  리틀-오메가 => 엄격한 하한값 상한값 all c, exist k : all x > k abs(f(x)) > abs(g(x))
+
+  증가 속도 비교 => 로피탈 적용해서 n->무한 일 때 극한값이 0이면 분자가 더 작음
