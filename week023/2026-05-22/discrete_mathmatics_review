@@ -1,0 +1,14 @@
+Module #7 Algorithmic complexity
+  빅 세타(1= constant, log n = logarithmic, log n ^ c = polylogarithmic, n : linear, n^c : polynomial, c^n(c>1) : exponential, n! : factorial)
+  tractable : 다루기 쉬움 => polynomial까지  intractable => 그 이상 복잡도 (예외는 존재)
+  NP : 옳은지 확인하기 위한 해결책으로서의 검사에 대한 다루기 쉬운 알고리즘이 존재하는 문제들의 집합
+
+Module #8 Basic number Theory
+    a|b => b = c*a인 정수 c가 존재함
+    1이상인 수 => 소수 또는 합성수(소수의 곱으로 표현이 유일하게 존재)
+    산술기본정리: 모든 양의 정수는 소수들의 곱으로 유일하게 표현 가능
+    나눗셈정리: 어떤 정수를 다른 정수로 나눌때(0이 아닌) 몫, 나머지는 유일함
+    최대공약수 : 소수의 곱 표현에서 공통으로 갖는 수와 지수를 모두 곱함
+    최소공배수 : 공통으로 공유하는 수의 최대의 제곱값들을 모두 곱함
+    서로소 : 최대공약수가 1인 수들
+    mod 연산자: 나머지
