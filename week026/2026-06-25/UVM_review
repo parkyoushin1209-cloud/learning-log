@@ -1,0 +1,24 @@
+UVM 테스트 생성법
+uvm_test에서 파생된 virtual 클래스 생성
+
+이 클래스의 build_phase에서 tb 인스턴스 생성
+위의 클래스에서 파생해서 특정 테스트 클래스를 만들고 super.build_phase 호출 후 설정 메커니즘 이용
+
+(테스트벤치의 설정 파라미터를 변경하려면 설정 메커니즘을 먼저 이용)
+run_test의 인자가 있다면 그 테스트 클래스 실행 이름이 없으면 uvm_fatal -> 잘못 타이핑 했거나 uvm_component_utils를 안 했을 수도 있음
+없다면 커맨드라인에서 +UVM_TESTNAME=~~로 테스트 입력도 가능(재컴파일, 재정교화 없어도 가능)
+이 또한 없다면 uvm_fatal
+
+가상 시퀀서
+시퀀서를 가상으로 만들고 다른 시퀀서에 대한 참조 변수에 할당해주기
+
+데이터 아이템/시퀀스 관련 사항
+uvm_sequence 에서 파생 트랜잭션 타입으로 파라미터화
+sequencer의 run_phase는 default라는 기본 시퀀서를 가짐
+uvm_config_db #(uvm_object_wrapper)::set(this,"~~~sequencer.run_phase", "default_sequence", seqA) 로 설정 가능하며 기본값으로설정됨 
+uvm_config_db#(uvm_sequence_lib_mode)::set(this, "~~~sequencer.run_phase", "default_sequence.selection_mode", UVM_SEQ_LIB_RAND/RANDC/ITEM/USER)
+USER면 int를 반환(선택된 인덱스를 반환)하는 select_sequence 메서드를 오버라이드 해야 함
+uvm_config_int::set(this, "~~~sequencer.run_phase", "default_sequence.min/max_random_count, 5) : 실행/생성할 시퀀스 수 설정 기본값은 10
+데이터 아이템에 제약을 추가하거나 제약 레이아웃 사용도 가능
+
+팩토리를 사용해 오버라이드 가능
