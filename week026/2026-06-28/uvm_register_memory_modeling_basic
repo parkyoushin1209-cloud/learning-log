@@ -1,0 +1,49 @@
+레지스터/메모리 모델 : 레지스터 필드, 레지스터, 레지스터 블록, 메모리, 주소맵을 포함하며 TB에 DUT의 미러 레지스터를 둠으로써 빠른 비교를 가능하게 함
+uvm_object에서 파생되므로 팩토리, 설정 메커니즘, 메시지 제어 가능
+
+시퀀스는 다른 시퀀스처럼 동작 재사용 가능
+레지스터 동작은 버스 프로토콜과 독립적이므로 제네릭 읽기/쓰기 버스 디스크립터를 사용해 묘사됨
+레지스터 모델, 레지스터 시퀀스는 uvm_reg_bus_op 트랜잭션을 사용함
+
+레지스터 동작
+uvm_reg_bus_op 구조체
+uvm_reg_data_t data // 버스 데이터
+uvm_reg_addr_t addr // 버스 주소
+uvm_access_e kind // 읽기 or 쓰기
+uvm_reg_byte_en byte_en  // 바이트 인에이블 지원
+uvm_status_e status // UVM_IS_OK, UUVM_HAS_X, UVM_NOT_OK
+등의 타입을 포함함
+ 
+어댑터
+레지스터 동작 <-> 트랜잭션 변환
+uvm_reg_adapter 에서 파생 이는 uvm_object도 부모 클래스로 가짐
+bus2reg, reg2bus 메서드를 가짐
+
+function uvm_sequence_item reg2bus(const ref uvm_reg_bus_op rw);
+apb_transfer transfer;
+transfer = apb_transfer::type_id::create("transfer");
+transfer.data = rw.data;
+transfer.addr = rw.addr;
+transfer.direction = (rw.kind == UVM_READ) ? APB_READ : APB_WRITE;
+return transfer;
+endfunction
+
+function void bus2reg(uvm_sequence_item bus_item, ref uvm_reg_bus_op rw);
+apb_transfer transfer;
+if(!cast(transfer, bus_item) begin
+`uvm_fatal("NOT_REG_TYPE", "incorrec bus item type. Expecting apb_transfer")
+return;
+end
+rw.kind = (transfer.direction == APB_READ) ? UVM_READ : UVM_WRITE;
+rw.addr = transfer.addr;
+rw.data = transfer.data;
+rw.status = UVM_IS_OK;
+endfunction
+
+컴포넌트가 아니고 오브젝트임
+
+바이트 인에이블을 지원할 경우
+멀티 바이트 버스에서 각각의 바이트 읽기/쓰기 가능 시
+supports_byte_enable 을 1로 설정
+
+버스 드라이버가 rsp를 반환한다면 provides_responses를 1로 설정
