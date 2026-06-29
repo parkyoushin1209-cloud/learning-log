@@ -1,0 +1,125 @@
+레지스터, 필드 FRONTDOOR API
+read/write : DUT에 접근해서 수정
+set/get : 레지스터모델에 접근해서 수정
+
+레지스터, 필드 BACKDOOR API
+peek/poke : DUT에 직접 접근(프로토콜 준수 없이)해 값을 수정함
+
+randomize()
+update() : DUT 값을 TB의 레지스터 미러 값으로 업데이트
+mirror() : 레지스터 미러 값을 DUT 현재 값으로 바꿔줌
+
+hdl_path 이용을 위해 UVM_BACKDOOR 를 인자로 넣어줘야 함 3번째 인자
+
+
+레지스터 모델 연결을 위한 필요조건
+1. UVM 래지스터, 레지스터 파일, IP-XACT 파일로부터 레지스터 모델
+2. 버스 특정 어댑터 클래스
+3. 인터페이스 버스 UVC
+
+to connection
+1. 트랜잭션 어댑터 생성
+2. 모듈 UVC에 트랜잭션 어댑터, 프레딕터 추가
+레지스터 모델로의 포인터를 얻기 위해 build_phase를 사용
+레지스터 모델 및 모듈 UVC를 테스트벤치에 연결
+TB의 build_phase에서 create, build, lock
+
+
+env(모듈 UVC)에서
+레지스터 모델(uvm_reg_block에서 확장), 어댑터(uvm_reg_adapter 에서 확장) , 프레딕터(uvm_reg_predictor에서 확장), 설정 객체 생성 후
+
+필드 자동화 매크로 -> 레지스터 모델, 어댑터(UVM_DEFAULT | UVM_REFERENCE) , 설정 객체
+ 
+빌드 페이즈
+어댑터, 프레딕터 팩토리를 이용해 생성
+
+커넥트 페이즈
+프레딕터의 어댑터 참조 변수를 어댑터로 설정
+uvm_reg_map에 대한 참조 변수도 가짐
+// 트랜잭션을 받았을 때 트랜잭션은 주소, 데이터만 가짐
+-> 어느 레지스터를 가리키는지, 레지스터가 모델의 어느 위치에 있는지 알아야 함
+-> 맵을 통해 해당 레지스터를 찾고 그 레지스터의 predict() 메서드를 호출함
+
+
+
+
+TB에서
+필요한 설정 객체, 버스 UVC, 인터페이스 UVC, 모듈 UVC, 가상 시퀀서, 레지스터 모델을 두고
+
+build_phase
+reg_model이 null이면 팩토리를 이용해 
+생성
+build : 레지스터 필드 생성, 설정 
+lock_model :레지스터 모델의 구조를 확정(수정 못하게)
+커버리지 인에이블이 1이면 uvm_reg::include_coverage 이용
+참조 모델 설정
+
+connect_phase
+가상 시퀀서 설정
+버스 환경의 버스 모니터의 item_collected_port와 모듈의 프레딕터의 bus_in export를 연결
+-> 프레딕터가 레지스터 모델을 업데이트 하고, 검사, 커버리지도 하도록 해줌
+레지스터 모델의 디폴트 맵에 대해 set_sequencer(버스 시퀀서, 어댑터 객체) 설정
+
+
+리셋
+reset_reg_model에서 reset 신호가 들어왔을 때만 reg_model.reset() 호출하는 방식으로 구현 가능(wait) 이용
+
+run_phase
+fork...join_none으로 리셋 동작, super.run_phase(phase) 동시 실행
+
+
+
+레지스터 시퀀스
+
+베이스 시퀀스를 생성할 것을 추천함
+virtual function void get_model()
+reg_model이 null이면
+
+설정 메커니즘을 이용해
+1. object get 후 $cast 실패 시 uvm_fatal
+2. 안 되면 #(uvm_reg_block) ::get 후 cast 실패시 uvm_fatal
+3. 둘 다 아니면 uvm_fatal reg_config 가 없음
+
+pre_start()에서 get_model() 호출 
+모든 시퀀스에 대해 호출되고 자동적으로 레지스터 모델을 설정할 것임
+
+pre_body, post_body에서 raise/drop_objection 실행
+
+
+
+// 레지스터 모델, 페이즈의 종료를 위한 raise/drop objection, 레지스터 모델을 할당할 get_model() 메서드를 포함하는 레지스터 모델 시퀀스를 위해
+uvm_sequence에서 파생
+레지스터 참조 모델
+body에서
+레지스터 모델이 없다면 -> 설정 메커니즘으로 get해서 uvm_object 객체에 담고 성공하면 cast 실패하면 uvm_fatal 띄우기
+
+이후 레지스터.write 하는 등 API 사용
+
+
+여러 레지스터에 대한 레지스터 설정 스퀀스
+body에 uvm_reg 타입 큐를 설정
+이후 model.get_registers(큐 이름)
+이후 foreach reg[i] 형식으로 접근 가능
+
+
+build에서 계층 구조 설정
+필드 : 생성, 설정만
+레지스터 파일 : 생성, 빌드, 설정, 잠그기
+
+mirror로 읽은 값을 검사하고 싶을 때는 UVM_CHECK를 2번째 인자로 줘야 함
+-> default_map.set_check_on_read() 메서드를 이용해 자동 검사하도록 조작 가능
+set_check_on_read() 사용 시 set_compare() 메서드를 UVM_NO_CHECK로 
+
+create_map() : 맵 생성  ,      add_submap() : 전체 주소 게층 완성을 위해 하위 맵을 추가함
+
+
+
+커버리지
+커버 그룹(읽기, 쓰기 용으로) 두 개 만들기 
+필드, 제약 설정
+sample 메서드에서 super.sample(data, byte_en, is_read, map) 해주기
+!is_read : 쓰기 커버리지 샘플
+is_read : 읽기 커버리지 샘플
+
+생성자에서 
+super.new(name, size, build_coverage(UVM_CVR_FIELD_VALS)) 형식으로 호출
