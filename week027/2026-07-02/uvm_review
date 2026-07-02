@@ -1,0 +1,33 @@
+Tx, Rx가 모두 있는 이유 -> 입력부, 출력부 모니터를 따로 두고 예상값과 실제값을 만들어 내 비교할 수 있도록
+Tx, Rx에 대해 각각 하나의 에이전트를 둠
+스코어보드에는 2개의 imp가 생기며 보통 이름은 
+add : 예상값을 구하고 큐에 저장
+match : DUT값과 큐에서 꺼낸 값을 비교
+각각에 대해 write가 필요하므로
+`uvm_analysis_imp_decl 매크로 사용(스코어보드 클래스 외부에)
+입력부 모니터에서도 샘플링 값을 정확히 받기 위해 버스 프로토콜이 중요한 것임
+
+클래스 변수에는 논블록킹 할당이 적절함
+DUT 신호는 <= 유지(드라이버 등 인터페이스 신호 구동 시)
+
+=를 사용해야 하는 것 트랜잭션의 클래스 멤버
+
+<= 를 사용해야 하는 것 RTL(인터페이스, DUT 신호)
+vif.addr<= ... vif.ready <= ... , vif.enable <= ....
+
+모듈 안에서 forever 만 x -> initial, always에 블록 두기
+
+extern 된 곳에 protected는 사용 안 함
+item_done에는 일반적으로 인자를 주지 않음
+
+run_phase는 계속 실행
+get_and_drive -> 계속 get_nex_item
+drive_transfer -> 딱 하나의 트랜잭션만 처리하고 반환
+
+uvm_do
+ start_item(~~);
+item 조작 
+   finish_item(~~);
+
+변수 선언은 앞에 나와야 함
+할당이 먼저
