@@ -2,6 +2,11 @@
 1. RAL 레지스터 모델링 익히기
 2. AI를 통해 문제 생성 후 모델링해보기
 
+내일 학습할 내용
+어댑터, 프레딕터 학습 
+통합 방법 학습
+기본 API 사용 연습
+
 결과물
 
 class mode_field extends uvm_reg_field;
